@@ -161,6 +161,7 @@ export default {
           <dt>Instalada en inicio</dt><dd>${instalada ? 'Sí' : 'No'}</dd>
           <dt>Almacenamiento protegido</dt><dd>${persistente ? 'Sí' : 'No'}</dd>
           <dt>Versión</dt><dd>${esc(VERSION_APP)}</dd>
+          <dt>Compilación</dt><dd data-compilacion>—</dd>
         </dl>
         ${instalada ? '' : `<div class="alert alert--info">${icon('info')}<span class="alert__body"><span class="alert__title">Instálala en la pantalla de inicio</span><span class="alert__text">iPhone: Compartir → “Agregar a inicio”. Android: menú ⋮ → “Instalar app”. Así funciona sin internet y el navegador no borra los datos.</span></span></div>`}
       </section>`;
@@ -235,6 +236,12 @@ export default {
         refrescar();
       }
     });
+    // Qué compilación sirve esta página (la versión del service worker): sirve para saber si ya llegó una actualización.
+    caches?.keys?.().then((claves) => {
+      const v = claves.find((k) => k.startsWith('ct-app-'));
+      const campo = el.querySelector('[data-compilacion]');
+      if (campo) campo.textContent = v ? v.replace('ct-app-', '') : 'sin instalar';
+    }).catch(() => {});
     return () => window.removeEventListener('prefs', alCambiarPref);
   },
 };

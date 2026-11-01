@@ -57,6 +57,18 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
     await page.click('.login button[type=submit]');
   };
 
+  // El service worker se registra al arrancar, ANTES de iniciar sesión (si no, sin sesión nunca llegarían las actualizaciones).
+  {
+    const ctxR = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    await ctxR.route('**/src/config.local.js', (r) => r.fulfill({ contentType: 'text/javascript', body: configLocal }));
+    const pr = await ctxR.newPage();
+    pr.setDefaultTimeout(5000);
+    await pr.goto(base);
+    await pr.waitForSelector('.login');
+    ok(await espera(() => pr.evaluate(() => navigator.serviceWorker.getRegistration().then(Boolean))), 'en modo nube el service worker se registra mientras se ve la pantalla de entrar');
+    await ctxR.close();
+  }
+
   // ---------- Ana: primera visita ----------
   const A = await nuevoContexto();
   const pa = A.page;

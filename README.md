@@ -35,7 +35,22 @@ npm i --no-save playwright axe-core && npx playwright install chromium
 
 Las tres corren en **GitHub Actions** en cada push (`.github/workflows/ci.yml`); las capturas quedan como artefacto. Un cambio se fusiona a `main` solo con las tres en verde (ver `CLAUDE.md`).
 
-## Publicar en GitHub Pages
+## Publicar en Cloudflare Pages (recomendado)
+
+Sirve la app desde la raíz de un dominio (`https://dilo-transporte.pages.dev`, o el tuyo), con cabeceras de caché y seguridad (`_headers`) que GitHub Pages no permite. El flujo `.github/workflows/cloudflare.yml` corre **en cada fusión a `main`** (que ya exige el CI en verde) y a mano; hasta que no configures Cloudflare, avisa y termina sin fallar.
+
+1. Entra a [dash.cloudflare.com](https://dash.cloudflare.com) (cuenta gratuita).
+2. **ID de la cuenta**: *Workers & Pages* → en la columna derecha, *Account ID* → cópialo.
+3. **Token**: *My Profile → API Tokens → Create Token → Create Custom Token*. Permiso: **Account · Cloudflare Pages · Edit**; recurso: tu cuenta. Cópialo en el momento (no se vuelve a mostrar).
+4. En GitHub (*Settings → Secrets and variables → Actions*): **Secrets** → `CLOUDFLARE_API_TOKEN` = el token. **Variables** → `CLOUDFLARE_ACCOUNT_ID` = el ID (y, si ya existen para GitHub Pages, `SUPABASE_URL` y `SUPABASE_ANON_KEY`). Opcional: `CLOUDFLARE_PROYECTO` (por defecto `dilo-transporte`).
+5. *Actions → Publicar en Cloudflare Pages → Run workflow* (rama `main`). Al terminar, el último paso imprime la dirección.
+6. **Dominio propio** (opcional): *Workers & Pages → tu proyecto → Custom domains → Set up a custom domain*. Si el dominio ya está en Cloudflare, crea el registro DNS solo; si lo vas a comprar, *Domain Registration → Register Domains*.
+
+El token vive solo en los secretos de GitHub: nunca en el código. Las claves se validan igual que en GitHub Pages: una `service_role` detiene la publicación.
+
+**Actualizaciones**: el service worker se registra al arrancar y, cuando llega una versión nueva, la página se recarga sola una vez (si alguien está escribiendo, espera al próximo cambio de pantalla). *Ajustes → Este dispositivo → Compilación* muestra qué versión corre (p. ej. `v14`).
+
+## Publicar en GitHub Pages (alternativa)
 
 1. Sube el repositorio a GitHub con `index.html` en la raíz.
 2. **Settings → Pages → Build and deployment → Source: Deploy from a branch**, rama **`main`**, carpeta **`/ (root)`**. Guarda.
@@ -105,8 +120,8 @@ src/core/grafica.js       gráfica de barras en SVG      src/core/fotos.js   red
 src/modules/              una pantalla por archivo (+ extensiones/ reservadas)
 src/styles/               tokens, base, componentes, animaciones
 tests/                    pruebas unitarias (node --test) y tests/fixtures/ (datos de prueba para e2e y QA, no se publican)
-scripts/                  servidor local, QA, e2e (+ modo nube), Supabase falso, generador de íconos, generador de config.local.js para publicar
-.github/workflows/        ci.yml (pruebas en cada push) y pages.yml (publicación manual con Supabase)
+scripts/                  armar-sitio.sh (lo que se publica), servidor local, QA, e2e (+ modo nube), Supabase falso, generador de íconos, generador de config.local.js para publicar
+.github/workflows/        ci.yml (pruebas en cada push), cloudflare.yml (publicación en cada fusión a main) y pages.yml (GitHub Pages, manual)
 ```
 
 ## Supabase: inicio de sesión, RLS y fotos privadas (fase 8)

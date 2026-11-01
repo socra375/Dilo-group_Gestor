@@ -26,4 +26,26 @@ async function abrirConEjemplo(page, base, hash = '#/inicio') {
   await page.reload(); // el cambio de hash por sí solo no vuelve a cargar los datos
 }
 
-module.exports = { abrirConEjemplo, esperarArranque };
+/** Servidor estático del repositorio cuyo sw.js se puede "publicar" con otra VERSION (simula una actualización). */
+function servidorConVersion() {
+  const http = require('http');
+  const fs = require('fs');
+  const path = require('path');
+  const raiz = path.resolve(__dirname, '..');
+  const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
+  let sufijo = '';
+  const srv = http.createServer((q, r) => {
+    const u = decodeURIComponent(new URL(q.url, 'http://x').pathname);
+    const archivo = path.join(raiz, u.endsWith('/') ? `${u}index.html` : u);
+    fs.readFile(archivo, (e, d) => {
+      if (e || !archivo.startsWith(raiz)) { r.writeHead(404); return r.end(); }
+      let cuerpo = d;
+      if (u === '/sw.js' && sufijo) cuerpo = Buffer.from(d.toString().replace(/const VERSION = '([^']+)'/, `const VERSION = '$1${sufijo}'`));
+      r.writeHead(200, { 'Content-Type': tipos[path.extname(archivo)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      r.end(cuerpo);
+    });
+  }).listen(0);
+  return { base: `http://localhost:${srv.address().port}/index.html`, publicar: (s) => { sufijo = s; }, cerrar: () => srv.close() };
+}
+
+module.exports = { abrirConEjemplo, esperarArranque, servidorConVersion };

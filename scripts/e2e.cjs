@@ -1,7 +1,7 @@
 // Flujos principales en navegador headless (390 px). Uso: node scripts/e2e.cjs
 const { chromium } = require('playwright');
 const { crear } = require('./serve.cjs');
-const { abrirConEjemplo } = require('./ayudas.cjs');
+const { abrirConEjemplo, servidorConVersion } = require('./ayudas.cjs');
 
 // Esperado: en modo demostración src/config.local.js no existe (está en .gitignore) y el navegador registra su 404. Solo ese recurso.
 const esperado404 = (m) => /status of 404/.test(m.text()) && /config\.local\.js/.test(m.location().url);
@@ -617,6 +617,42 @@ async function espera(cond, ms = 4000) {
     ok(choferes.length === 1 && choferes[0].nombre === 'Chofer de la versión anterior', 'datos de localStorage migrados a IndexedDB');
     ok((await p2.evaluate(() => localStorage.getItem('ct:v1:choferes'))) === null, 'claves viejas de localStorage borradas');
     await ctx2.close();
+  }
+
+  // Actualización: cuando se publica una versión nueva, el service worker nuevo toma el control y la página se recarga
+  // sola UNA vez (antes se seguía viendo la copia vieja hasta recargar a mano). Si alguien está escribiendo, espera.
+  {
+    const act = servidorConVersion();
+    const ctxS = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const pS = await ctxS.newPage();
+    pS.setDefaultTimeout(8000);
+    const versionActual = () => pS.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('ct-app-')).sort().join(','));
+    await pS.goto(act.base);
+    await pS.evaluate(() => navigator.serviceWorker.ready);
+    await pS.reload();
+    await pS.waitForFunction(() => navigator.serviceWorker.controller && document.querySelector('#view .view, #view [data-cuerpo]'));
+    const v0 = await versionActual();
+    await pS.evaluate(() => { window.__marca = 'original'; });
+    act.publicar('-a');
+    await pS.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+    ok(await espera(async () => (await pS.evaluate(() => window.__marca).catch(() => 'recargando')) !== 'original', 8000), 'una versión nueva recarga la página sola');
+    await pS.waitForFunction(() => document.querySelector('#view .view, #view [data-cuerpo]'));
+    ok(await espera(async () => (await versionActual()).endsWith('-a') && !(await versionActual()).includes(','), 4000), `la caché vieja se reemplaza por la nueva (${v0} → ${await versionActual()})`);
+
+    // Con un formulario abierto no se interrumpe: recarga al cambiar de pantalla.
+    await pS.evaluate(() => { location.hash = '#/choferes'; });
+    await pS.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Choferes');
+    await pS.click('[data-nuevo]');
+    await pS.waitForSelector('dialog.sheet form #f-nombre');
+    await pS.evaluate(() => { window.__marca = 'con-formulario'; });
+    act.publicar('-b');
+    await pS.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+    await pS.waitForTimeout(2500);
+    ok((await pS.evaluate(() => window.__marca)) === 'con-formulario', 'con un formulario abierto NO recarga (no se pierde lo que se escribe)');
+    await pS.evaluate(() => { location.hash = '#/inicio'; });
+    ok(await espera(async () => (await pS.evaluate(() => window.__marca).catch(() => 'recargando')) !== 'con-formulario', 6000), 'y recarga al cambiar de pantalla');
+    await ctxS.close();
+    act.cerrar();
   }
 
   await navegador.close();

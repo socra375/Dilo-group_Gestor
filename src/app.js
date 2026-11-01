@@ -35,6 +35,7 @@ async function cargarNube() {
 }
 
 async function iniciar() {
+  iniciarServiceWorker();
   document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
   document.getElementById('brand-name').textContent = CONFIG.empresa.nombre;
   // Altura real de la cabecera para los títulos de día "pegajosos" (cambia con el tamaño de letra).
@@ -74,10 +75,30 @@ async function iniciar() {
   }
   await iniciarRouter();
   pedirPersistencia();
+}
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker no registrado', e));
-  }
+/**
+ * Service worker. Se registra AL ARRANCAR, antes de pedir sesión: si se registrara al final, en modo nube no ocurriría
+ * hasta que alguien entrara, y quien ya tiene una versión vieja instalada seguiría viéndola (el service worker sirve la
+ * copia guardada primero). Cuando una versión nueva toma el control, la página se recarga UNA vez para dejar de mostrar
+ * la copia vieja; no se recarga en la primera instalación ni mientras alguien escribe (espera al próximo cambio de pantalla).
+ */
+function iniciarServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  const teniaControl = Boolean(navigator.serviceWorker.controller);
+  let recargada = false;
+  const escribiendo = () => Boolean(document.querySelector('dialog[open]')) || document.activeElement?.matches?.('input, textarea, select');
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!teniaControl || recargada) return;
+    recargada = true;
+    if (escribiendo()) window.addEventListener('hashchange', () => location.reload(), { once: true });
+    else location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    const buscar = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') buscar(); });
+    setInterval(buscar, 60 * 60 * 1000); // una app instalada puede quedar abierta días
+  }).catch((e) => console.warn('Service worker no registrado', e));
 }
 
 iniciar();

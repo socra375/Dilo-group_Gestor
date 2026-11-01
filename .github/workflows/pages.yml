@@ -35,18 +35,11 @@ jobs:
       - name: Pruebas unitarias (incluye la comprobación de que no hay claves secretas en el código)
         run: npm test
 
-      - name: Armar el sitio (solo lo que usa la página)
-        run: |
-          mkdir _site
-          cp -r index.html manifest.webmanifest sw.js icons src _site/
-          cp LICENSE.md _site/
-          rm -f _site/src/config.local.js
-
-      - name: Activar Supabase si hay variables (rechaza cualquier clave que no sea la pública)
+      - name: Armar el sitio (solo lo que usa la página; rechaza cualquier clave que no sea la pública)
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-        run: node scripts/generar-config-local.cjs _site
+        run: bash scripts/armar-sitio.sh _site
 
       - uses: actions/configure-pages@v5
 

@@ -1,0 +1,22 @@
+# Cabeceras de Cloudflare Pages (GitHub Pages las ignora).
+# Caché: el navegador revalida siempre lo que cambia con cada versión; el service worker se encarga de la velocidad y del
+# modo sin conexión. Así una publicación nueva llega sin depender de un max-age del servidor.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/src/*
+  Cache-Control: no-cache
+/icons/*
+  Cache-Control: public, max-age=86400
+
+# Seguridad básica en todas las rutas.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: microphone=(), geolocation=(), payment=(), usb=()

@@ -2,7 +2,7 @@
 // - Archivos propios: se sirven desde caché y se actualizan en segundo plano (la versión nueva llega en la siguiente apertura).
 // - Fuentes de Google: caché en tiempo de ejecución.
 // Al publicar cambios, sube VERSION para limpiar cachés viejas. tests/sw.test.js verifica que ARCHIVOS esté completo.
-const VERSION = 'v13';
+const VERSION = 'v14';
 const CACHE = `ct-app-${VERSION}`;
 const CACHE_FUENTES = 'ct-fuentes';
 
@@ -51,7 +51,17 @@ const ARCHIVOS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
+  // cache: 'reload' = ir siempre a la red. Con addAll(), un max-age del servidor (GitHub Pages: 10 min; Cloudflare: horas)
+  // podía hacer que una versión nueva precargara archivos VIEJOS de la caché HTTP del navegador.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => Promise.all(ARCHIVOS.map(async (url) => {
+        const r = await fetch(new Request(url, { cache: 'reload' }));
+        if (!r.ok) throw new Error(`${url}: ${r.status}`);
+        await c.put(url, r);
+      })))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
