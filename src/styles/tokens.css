@@ -1,7 +1,7 @@
-/* Tokens de diseño. --brand y --accent los fija app.js desde config.apariencia. */
+/* Tokens de diseño. --brand y --accent los fija app.js desde CONFIG.tema. */
 :root {
-  --brand: #0f4c81;
-  --accent: #f5a524;
+  --brand: #12334a;
+  --accent: #f2a900;
 
   /* Tipografía */
   --font-display: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
@@ -55,6 +55,9 @@
   --c-on-primary: #ffffff;
   --c-accent: var(--accent);
   --c-on-accent: #1d1400;
+  --c-header: var(--brand);
+  --c-on-header: #ffffff;
+  --c-on-header-muted: rgb(255 255 255 / 0.78);
 
   --c-bg: #f2f4f7;
   --c-surface: #ffffff;

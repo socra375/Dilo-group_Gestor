@@ -1,18 +1,30 @@
 // Preferencias de ESTE dispositivo (tema, letra, tolerancia, marcas internas).
 // No forman parte de la capa de datos: al migrar a Supabase siguen en localStorage.
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
+import { TAMANOS_LETRA } from './esquemas.js';
 
 const CLAVE = 'ct:prefs';
 
 const porDefecto = () => ({
-  tema: config.apariencia.tema,
-  tamanoLetra: config.apariencia.tamanoLetra,
-  toleranciaMin: config.negocio.toleranciaMin,
+  tema: CONFIG.tema.modo, // 'claro' | 'oscuro'
+  letra: CONFIG.tema.letra, // 'normal' | 'grande' | 'extra'
+  toleranciaMin: CONFIG.viajes.tolerancia_min,
   sembrado: false,
   ultimoRespaldo: null,
 });
 
 let actual = null;
+
+// La versión anterior guardaba tema 'sistema' y el tamaño en px; se traducen al formato nuevo.
+function normalizar(p) {
+  if (p.tema !== 'claro' && p.tema !== 'oscuro') delete p.tema;
+  if (!p.letra && p.tamanoLetra) {
+    p.letra = Object.entries(TAMANOS_LETRA).find(([, px]) => px === Number(p.tamanoLetra))?.[0];
+  }
+  if (!TAMANOS_LETRA[p.letra]) delete p.letra;
+  delete p.tamanoLetra;
+  return p;
+}
 
 function cargar() {
   if (actual) return actual;
@@ -22,7 +34,7 @@ function cargar() {
   } catch {
     guardado = {};
   }
-  actual = { ...porDefecto(), ...guardado };
+  actual = { ...porDefecto(), ...normalizar(guardado) };
   return actual;
 }
 
@@ -41,3 +53,4 @@ export function setPref(clave, valor) {
 }
 
 export const tolerancia = () => Number(pref('toleranciaMin')) || 0;
+export const letraPx = () => TAMANOS_LETRA[pref('letra')] ?? TAMANOS_LETRA.normal;

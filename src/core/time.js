@@ -1,10 +1,10 @@
 // Fechas y horas en la zona del negocio (America/Santo_Domingo por defecto).
 // Todos los instantes se guardan como ISO UTC; "fecha clave" = 'YYYY-MM-DD' y "hora clave" = 'HH:MM'
 // siempre interpretadas en la zona del negocio, sin importar la zona del teléfono.
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
 
 const MIN = 60000;
-const ZONA = config.regional.zonaHoraria;
+const ZONA = CONFIG.empresa.zona;
 
 const formateadores = new Map();
 function partes(fecha, tz) {
@@ -129,7 +129,7 @@ export function formatoDuracion(min) {
  *   retrasoMin:  llegada real − llegada programada (negativo = llegó antes); null si no ha llegado
  * Un viaje cuenta como retrasado solo si el retraso SUPERA la tolerancia.
  */
-export function estadoViaje(viaje, ahora = new Date(), toleranciaMin = config.negocio.toleranciaMin) {
+export function estadoViaje(viaje, ahora = new Date(), toleranciaMin = CONFIG.viajes.tolerancia_min) {
   const t = new Date(ahora).getTime();
   if (viaje.llegadaReal) {
     const retrasoMin = minutosEntre(viaje.llegadaProg, viaje.llegadaReal);
@@ -156,7 +156,7 @@ export function estadoViaje(viaje, ahora = new Date(), toleranciaMin = config.ne
 }
 
 /** Estado de una licencia: null (sin fecha), 'vigente', 'por_vencer' (≤ dias) o 'vencida'. */
-export function estadoLicencia(venceClave, hoy, dias = config.negocio.diasAvisoLicencia) {
+export function estadoLicencia(venceClave, hoy, dias = Math.max(...CONFIG.avisos.licencia.dias)) {
   if (!venceClave) return { estado: null, dias: null };
   const d = diasEntre(hoy, venceClave);
   return { estado: d < 0 ? 'vencida' : d <= dias ? 'por_vencer' : 'vigente', dias: d };

@@ -9,6 +9,9 @@ const ok = (cond, msg) => {
 };
 
 // Reintenta una condición hasta `ms`: la lista se repinta de forma asíncrona tras guardar.
+// Lee una colección con el mismo store.js que usa la app (IndexedDB), dentro de la página.
+const leer = (page, col) => page.evaluate(async (c) => (await import('/src/data/store.js')).list(c, { archivados: 'todos' }), col);
+
 async function espera(cond, ms = 4000) {
   const fin = Date.now() + ms;
   for (;;) {
@@ -51,10 +54,7 @@ async function espera(cond, ms = 4000) {
   await page.fill('#f-llegadaReal', '00:40');
   await page.click('dialog.sheet button[type=submit]');
   await page.waitForSelector('dialog.sheet', { state: 'detached' });
-  const ultimo = await page.evaluate(() => {
-    const v = JSON.parse(localStorage.getItem('ct:v1:viajes')).filter((x) => !x.ejemplo).pop();
-    return v;
-  });
+  const ultimo = (await leer(page, 'viajes')).filter((x) => !x.ejemplo).pop();
   ok(ultimo && ultimo.llegadaProg > ultimo.salidaProg, 'llegada programada guardada al día siguiente');
   const tarjeta = page.locator('.item', { hasText: '11:50 p. m.' }).filter({ hasText: 'Retrasado' });
   ok((await tarjeta.count()) === 1, 'viaje nocturno muestra "Retrasado (+25 min)"');
@@ -85,7 +85,7 @@ async function espera(cond, ms = 4000) {
       if (!guardado) {
         // Diagnóstico para el log de CI: qué había en pantalla y en el almacenamiento.
         console.log('   tarjetas:', JSON.stringify(await page.locator('.item').allTextContents()));
-        console.log('   en almacenamiento:', await page.evaluate(() => JSON.parse(localStorage.getItem('ct:v1:viajes')).filter((v) => v.motivoRetraso).map((v) => `${v.id}: ${v.motivoRetraso}`).join(' | ')));
+        console.log('   en almacenamiento:', (await leer(page, 'viajes')).filter((v) => v.motivoRetraso).map((v) => `${v.id}: ${v.motivoRetraso}`).join(' | '));
       }
     } else ok(true, 'llegada registrada a tiempo');
   }
@@ -112,10 +112,11 @@ async function espera(cond, ms = 4000) {
   await page.waitForTimeout(300);
   await page.evaluate(() => { location.hash = '#/vehiculos'; });
   await page.waitForSelector('[data-lista] .item');
+  const vehiculosAntes = await page.locator('[data-lista] .item').count();
   await page.locator('[data-editar]').first().click();
   await page.click('[data-accion="archivar"]');
   await page.click('dialog.modal [data-r="1"]');
-  ok(await espera(async () => (await page.locator('[data-lista] .item').count()) === 2), 'vehículo archivado sale de la lista de activos');
+  ok(await espera(async () => (await page.locator('[data-lista] .item').count()) === vehiculosAntes - 1), 'vehículo archivado sale de la lista de activos');
   await page.click('[data-filtro="1"]');
   ok(await espera(async () => (await page.locator('[data-lista] .item').count()) === 1), 'aparece en Archivados');
 
@@ -144,34 +145,52 @@ async function espera(cond, ms = 4000) {
   ok((await page.evaluate(() => JSON.parse(localStorage.getItem('ct:prefs')).toleranciaMin)) === 10, 'tolerancia guardada');
 
   // Tema oscuro manual.
-  await page.click('[data-tema="oscuro"]');
+  await page.check('#f-oscuro');
   ok((await page.evaluate(() => document.documentElement.dataset.theme)) === 'oscuro', 'tema oscuro aplicado');
-  await page.click('[data-letra="21"]');
+  await page.click('[data-letra="extra"]');
   ok((await page.evaluate(() => document.documentElement.style.fontSize)) === '21px', 'tamaño de letra aplicado');
 
   // Respaldo: exportar → borrar ejemplo → importar restaura.
   const [resp] = await Promise.all([page.waitForEvent('download'), page.click('[data-exportar]')]);
   const rutaResp = await resp.path();
-  const totalAntes = await page.evaluate(() => JSON.parse(localStorage.getItem('ct:v1:viajes')).length);
+  const totalAntes = (await leer(page, 'viajes')).length;
   await page.click('[data-borrar-ejemplo]');
   await page.click('dialog.modal [data-r="1"]');
-  await espera(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('ct:v1:viajes')).every((v) => !v.ejemplo))));
+  await espera(async () => (await leer(page, 'viajes')).every((v) => !v.ejemplo));
   // Ajustes se repinta tras borrar (la pantalla queda vacía un instante): esperar a que la nueva ya esté
   // completa —sin la sección de ejemplo y con el campo de importar— antes de actuar.
   await espera(async () => (await page.locator('[data-borrar-ejemplo]').count()) === 0 && (await page.locator('#f-importar').count()) === 1);
-  const quedan = await page.evaluate(() => JSON.parse(localStorage.getItem('ct:v1:viajes')));
+  const quedan = await leer(page, 'viajes');
   ok(quedan.length >= 1 && quedan.every((v) => !v.ejemplo), `datos de ejemplo borrados; quedan ${quedan.length} viaje(s) del usuario`);
   ok(await espera(() => page.locator('#badge-ejemplo').isHidden()), 'franja "datos de ejemplo" desaparece');
   const campoViejo = await page.$('#f-importar');
   await page.setInputFiles('#f-importar', rutaResp);
   await page.click('dialog.modal [data-r="1"]');
-  ok(await espera(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('ct:v1:viajes')).length)) === totalAntes), 'importar respaldo restaura todos los viajes');
+  ok(await espera(async () => (await leer(page, 'viajes')).length === totalAntes), 'importar respaldo restaura todos los viajes');
   // Importar repinta Ajustes: esperar a que el campo anterior se desmonte antes de seguir.
   ok(await espera(() => campoViejo.evaluate((el) => !el.isConnected)), 'Ajustes se repinta tras importar');
   await page.setInputFiles('#f-importar', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hola":1}') });
   ok(await espera(async () => (await page.textContent('#f-importar-err')).includes('no es un respaldo')), 'archivo ajeno rechazado con mensaje');
 
   ok(!errores.length, `sin errores de consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
+  // Migración: datos de la versión anterior (localStorage) pasan a IndexedDB una sola vez.
+  {
+    const ctx2 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await ctx2.addInitScript(() => {
+      if (sessionStorage.getItem('sembrado-prueba')) return; // solo en la primera carga
+      sessionStorage.setItem('sembrado-prueba', '1');
+      localStorage.setItem('ct:prefs', JSON.stringify({ sembrado: true }));
+      localStorage.setItem('ct:v1:choferes', JSON.stringify([{ id: 'viejo-1', nombre: 'Chofer de la versión anterior', archivado: false }]));
+    });
+    const p2 = await ctx2.newPage();
+    await p2.goto(`${base}#/choferes`);
+    await p2.waitForSelector('[data-lista] .item');
+    const choferes = await leer(p2, 'choferes');
+    ok(choferes.length === 1 && choferes[0].nombre === 'Chofer de la versión anterior', 'datos de localStorage migrados a IndexedDB');
+    ok((await p2.evaluate(() => localStorage.getItem('ct:v1:choferes'))) === null, 'claves viejas de localStorage borradas');
+    await ctx2.close();
+  }
+
   await navegador.close();
   servidor.close();
   console.log(fallos ? `\n${fallos} fallo(s).` : '\nFlujos OK.');

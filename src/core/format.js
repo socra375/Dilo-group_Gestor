@@ -1,7 +1,8 @@
 // Formatos visibles (es-DO): horas 12 h con a. m./p. m., dinero RD$, fechas cortas.
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
+import { LOCALE as locale, MONEDA_ISO as moneda } from './esquemas.js';
 
-const { locale, zonaHoraria: tz, moneda } = config.regional;
+const tz = CONFIG.empresa.zona;
 
 const fmtDinero = new Intl.NumberFormat(locale, { style: 'currency', currency: moneda, minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDineroCorto = new Intl.NumberFormat(locale, { style: 'currency', currency: moneda, maximumFractionDigits: 0 });
@@ -22,13 +23,14 @@ export const hora = (iso) => (iso ? fmtHora.format(new Date(iso)) : '—');
 
 // Las fechas clave ('YYYY-MM-DD') se formatean a mediodía UTC para que ninguna zona las corra de día.
 const deClave = (clave) => new Date(`${clave}T12:00:00Z`);
-export const fecha = (clave) => (clave ? fmtFechaCorta.format(deClave(clave)) : '—');
+export const fecha = (clave) => (clave ? fmtFechaNum.format(deClave(clave)) : '—');
+export const fechaCorta = (clave) => (clave ? fmtFechaCorta.format(deClave(clave)) : '—');
 export const fechaLarga = (clave) => (clave ? fmtFechaLarga.format(deClave(clave)) : '—');
 export const fechaNum = (clave) => (clave ? fmtFechaNum.format(deClave(clave)) : '—');
 export const mes = (clave) => (clave ? fmtMes.format(deClave(clave)) : '—');
 
 const UNIDADES = { galones: { corta: 'gal', larga: 'galones' }, litros: { corta: 'L', larga: 'litros' } };
-export const unidad = (forma = 'corta') => (UNIDADES[config.negocio.unidadCombustible] || UNIDADES.galones)[forma];
+export const unidad = (forma = 'corta') => (UNIDADES[CONFIG.combustible.unidad] || UNIDADES.galones)[forma];
 export const cantidad = (n) => `${numero(n, Number(n) % 1 ? 1 : 0)} ${unidad()}`;
 
 /** '8095550142' → '(809) 555-0142' */

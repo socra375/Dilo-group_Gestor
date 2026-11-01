@@ -1,4 +1,4 @@
-// Formularios generados desde config.modulos[x].campos: render, lectura, validación y hoja inferior.
+// Formularios generados desde los esquemas (src/core/esquemas.js) y CONFIG: render, lectura, validación y hoja inferior.
 import { esc, abrirHoja, toast, icon } from './ui.js';
 import { unidad, telefono, cedula } from './format.js';
 

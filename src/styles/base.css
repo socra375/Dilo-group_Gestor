@@ -106,10 +106,9 @@ textarea {
   gap: var(--sp-2);
   min-height: 56px;
   padding: calc(env(safe-area-inset-top) + var(--sp-2)) var(--gutter) var(--sp-2);
-  background: color-mix(in oklab, var(--c-bg) 88%, transparent);
-  backdrop-filter: saturate(1.4) blur(10px);
-  -webkit-backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--c-border);
+  background: var(--c-header);
+  color: var(--c-on-header);
+  border-bottom: 1px solid color-mix(in oklab, var(--c-header) 70%, black);
 }
 
 .app-header {
@@ -133,7 +132,7 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--fs-xs);
-  color: var(--c-text-muted);
+  color: var(--c-on-header-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 700;
@@ -146,6 +145,19 @@ textarea {
 }
 
 .app-main:focus { outline: none; }
+
+/* Aviso discreto mientras los datos vivan solo en el teléfono (hasta la fase 8: Supabase con RLS). */
+.demo-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  margin: 0 0 var(--sp-3);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+.demo-note[hidden] { display: none; }
 
 .view {
   display: grid;

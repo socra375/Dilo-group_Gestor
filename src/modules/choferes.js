@@ -1,6 +1,6 @@
 // Choferes + registro de turnos (entrada/salida por día).
 import * as store from '../data/store.js';
-import { config, camposDe } from '../config.js';
+import { camposDe, PARAMETROS } from '../core/esquemas.js';
 import { pantallaCrud, chipSeleccion } from '../core/crud.js';
 import { hoyClave, estadoLicencia, fechaClave, horaClave, aISO, horaDespues, minutosEntre, formatoDuracion } from '../core/time.js';
 import * as fmt from '../core/format.js';
@@ -24,7 +24,7 @@ export function turnoAbierto(turnos, choferId) {
     .sort((a, b) => b.entrada.localeCompare(a.entrada))[0] ?? null;
 }
 
-export const turnoLargo = (t, ahora = new Date()) => minutosEntre(t.entrada, ahora.toISOString()) > config.negocio.horasTurnoLargo * 60;
+export const turnoLargo = (t, ahora = new Date()) => minutosEntre(t.entrada, ahora.toISOString()) > PARAMETROS.horasTurnoLargo * 60;
 
 // ---------- Turnos ----------
 

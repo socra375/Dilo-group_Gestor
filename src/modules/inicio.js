@@ -1,6 +1,7 @@
-// Inicio: totales del día, avisos y viajes de hoy. Bloques y avisos configurables en config.inicio.
+// Inicio: totales del día, avisos y viajes de hoy.
 import * as store from '../data/store.js';
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
+import { PARAMETROS } from '../core/esquemas.js';
 import { pref, tolerancia } from '../core/prefs.js';
 import { hoyClave, sumarDias, fechaClave, estadoViaje, diasEntre } from '../core/time.js';
 import * as fmt from '../core/format.js';
@@ -10,8 +11,19 @@ import { avisoLicencia, turnoAbierto, turnoLargo } from './choferes.js';
 
 let contadoresAnimados = false;
 
+// Provisional: la fase 5 rehace Inicio como "Resumen con números" (4 tarjetas, avisos y gráfica).
+const INICIO = {
+  bloques: [{ id: 'totales', activo: true }, { id: 'avisos', activo: true }, { id: 'viajesHoy', activo: true }],
+  totales: [
+    { id: 'viajes', etiqueta: 'Viajes hoy', activo: true },
+    { id: 'retrasos', etiqueta: 'Retrasos', activo: true },
+    { id: 'combustible', etiqueta: 'Combustible', activo: true },
+  ],
+  avisos: { sinLlegada: true, salidaPendiente: true, licencias: CONFIG.avisos.licencia.activo, turnoLargo: true, respaldo: true },
+};
+
 function saludo() {
-  const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: config.regional.zonaHoraria, hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+  const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: CONFIG.empresa.zona, hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 
@@ -37,7 +49,7 @@ function calcular({ viajes, combustible, choferes, turnos }) {
     },
   };
 
-  const op = config.inicio.avisos;
+  const op = INICIO.avisos;
   const avisos = [];
   if (op.sinLlegada) {
     // Hoy y ayer: un viaje nocturno de ayer sin cerrar también importa.
@@ -57,14 +69,14 @@ function calcular({ viajes, combustible, choferes, turnos }) {
   if (op.turnoLargo) {
     for (const c of choferes.filter((x) => !x.archivado)) {
       const t = turnoAbierto(turnos, c.id);
-      if (t && turnoLargo(t, ahora)) avisos.push({ tono: 'aviso', titulo: `${c.nombre} lleva más de ${config.negocio.horasTurnoLargo} h en turno`, texto: `Entrada: ${fmt.fecha(t.fecha)}, ${fmt.hora(t.entrada)}. ¿Falta marcar la salida?`, href: '#/choferes' });
+      if (t && turnoLargo(t, ahora)) avisos.push({ tono: 'aviso', titulo: `${c.nombre} lleva más de ${PARAMETROS.horasTurnoLargo} h en turno`, texto: `Entrada: ${fmt.fecha(t.fecha)}, ${fmt.hora(t.entrada)}. ¿Falta marcar la salida?`, href: '#/choferes' });
     }
   }
   if (op.respaldo) {
     const reales = [viajes, combustible, choferes].some((l) => l.some((x) => !x.ejemplo));
     const ultimo = pref('ultimoRespaldo');
     const dias = ultimo ? diasEntre(fechaClave(ultimo), hoy) : null;
-    if (reales && (dias === null || dias > config.negocio.diasAvisoRespaldo)) {
+    if (reales && (dias === null || dias > PARAMETROS.diasAvisoRespaldo)) {
       avisos.push({ tono: 'info', titulo: 'Haz un respaldo de tus datos', texto: dias === null ? 'Aún no has exportado ningún respaldo.' : `El último fue hace ${fmt.plural(dias, 'día', 'días')}.`, href: '#/ajustes' });
     }
   }
@@ -100,7 +112,7 @@ export default {
       ultimos = { viajes, refs };
       const d = calcular({ viajes, combustible, choferes, turnos });
       const bloques = {
-        totales: () => `<section class="section" aria-label="Totales del día"><div class="stats">${config.inicio.totales
+        totales: () => `<section class="section" aria-label="Totales del día"><div class="stats">${INICIO.totales
           .filter((t) => t.activo)
           .map((t, i) => `<div class="stat ${i === 0 ? 'stat--hero' : ''} ${t.id === 'retrasos' && d.totales.retrasos.valor ? 'stat--warn' : ''}">
               <span class="stat__label">${esc(t.etiqueta)}</span>
@@ -125,12 +137,12 @@ export default {
       };
       cuerpo.innerHTML = `<div class="view">
           <div><p class="muted" style="font-weight:700">${esc(saludo())}</p><p style="font-family:var(--font-display);font-size:var(--fs-xl);font-weight:700">${esc(fmt.fechaLarga(d.hoy).replace(/^./, (c) => c.toUpperCase()))}</p></div>
-          ${config.inicio.bloques.filter((b) => b.activo && bloques[b.id]).map((b) => bloques[b.id]()).join('')}
+          ${INICIO.bloques.filter((b) => b.activo && bloques[b.id]).map((b) => bloques[b.id]()).join('')}
         </div>`;
 
       if (animar && !contadoresAnimados) {
         contadoresAnimados = true;
-        for (const t of config.inicio.totales.filter((x) => x.activo)) {
+        for (const t of INICIO.totales.filter((x) => x.activo)) {
           const n = cuerpo.querySelector(`[data-contador="${t.id}"]`);
           animarContador(n, d.totales[t.id].valor, d.totales[t.id].dinero ? fmt.dineroCorto : (x) => String(Math.round(x)));
         }

@@ -1,6 +1,8 @@
 // Datos de ejemplo: se cargan una sola vez en el primer uso y llevan `ejemplo: true`.
+// Nombres, cédulas (000-…, no existen) y teléfonos (809-555-01xx, reservados para ficción) son inventados.
 import * as store from './store.js';
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
+import { MOTIVOS_RETRASO } from '../core/esquemas.js';
 import { pref, setPref } from '../core/prefs.js';
 import { aISO, hoyClave, sumarDias, sumarMinutos, diaSemana } from '../core/time.js';
 
@@ -16,7 +18,7 @@ function azar(semilla) {
   };
 }
 
-const MOTIVOS = ['Tapón en la Duarte', 'Lluvia fuerte', 'Avería menor (goma)', 'Accidente en la vía', 'Personal llegó tarde a la parada', 'Desvío por obras en la avenida'];
+const PRECIO_GALON = { Gasoil: 235.1, Gasolina: 272.5 }; // SUPUESTO: precios de referencia para el ejemplo
 
 export async function sembrarSiPrimeraVez(ahora = new Date()) {
   if (pref('sembrado')) return false;
@@ -31,98 +33,129 @@ export async function sembrarSiPrimeraVez(ahora = new Date()) {
 }
 
 export async function sembrar(ahora = new Date()) {
-  const r = azar(20261026);
+  const r = azar(20261101);
   const entre = (a, b) => a + Math.floor(r() * (b - a + 1));
   const hoy = hoyClave(ahora);
+  const ahoraT = ahora.getTime();
   const ej = { ejemplo: true };
 
+  const vehiculos = [
+    { placa: 'I045821', descripcion: 'Toyota Coaster 2019 · 30 pasajeros', estado: 'disponible', seguroAseguradora: 'Aseguradora Demo', seguroPoliza: 'POL-DEMO-0001', seguroVence: sumarDias(hoy, 210), mantenimientoFecha: sumarDias(hoy, 60), mantenimientoKm: 135000 },
+    // Seguro por vencer en 12 días → aviso de seguro.
+    { placa: 'I067310', descripcion: 'Hyundai County 2021 · 29 pasajeros', estado: 'disponible', seguroAseguradora: 'Aseguradora Demo', seguroPoliza: 'POL-DEMO-0002', seguroVence: sumarDias(hoy, 12), mantenimientoFecha: sumarDias(hoy, 90), mantenimientoKm: 75000 },
+    // Mantenimiento próximo por kilometraje (se ajusta abajo al último km registrado).
+    { placa: 'I052984', descripcion: 'Nissan Urvan 2018 · 15 pasajeros', estado: 'disponible', seguroAseguradora: 'Aseguradora Demo', seguroPoliza: 'POL-DEMO-0003', seguroVence: sumarDias(hoy, 150), mantenimientoFecha: sumarDias(hoy, 40), mantenimientoKm: null },
+    { placa: 'G031177', descripcion: 'Toyota Hiace 2020 · 15 pasajeros', estado: 'disponible', seguroAseguradora: 'Aseguradora Demo', seguroPoliza: 'POL-DEMO-0004', seguroVence: sumarDias(hoy, 320), mantenimientoFecha: sumarDias(hoy, 75), mantenimientoKm: 95000 },
+  ].map((v, i) => ({ ...v, ...ej, id: `ej-vehiculo-${i + 1}` }));
+
   const choferes = [
-    { nombre: 'Juan Carlos Pérez Mejía', telefono: '8095550142', cedula: '00112345678', licencia: 'Cat. 4 · 4502318', licenciaVence: sumarDias(hoy, 410), estado: 'activo' },
-    { nombre: 'Ramón Antonio Féliz', telefono: '8295550187', cedula: '40223456781', licencia: 'Cat. 4 · 4498120', licenciaVence: sumarDias(hoy, 18), estado: 'activo' },
-    { nombre: 'María Altagracia Santos', telefono: '8495550123', cedula: '22334567892', licencia: 'Cat. 3 · 3871045', licenciaVence: sumarDias(hoy, 240), estado: 'activo' },
-    { nombre: 'Luis Manuel De la Cruz', telefono: '8095550199', cedula: '03145678903', licencia: 'Cat. 4 · 4120776', licenciaVence: sumarDias(hoy, 95), estado: 'vacaciones' },
-  ].map((c, i) => ({ ...c, ...ej, id: `ej-chofer-${i + 1}` }));
+    { nombre: 'Juan Carlos Pérez Mejía', licenciaDias: 410 },
+    // Licencia por vencer en 10 días → aviso de licencia.
+    { nombre: 'Ramón Antonio Féliz', licenciaDias: 10 },
+    { nombre: 'María Altagracia Santos', licenciaDias: 240 },
+    { nombre: 'Luis Manuel De la Cruz', licenciaDias: 95 },
+    { nombre: 'Pedro José Almonte', licenciaDias: 180 },
+  ].map((c, i) => ({
+    ...ej,
+    id: `ej-chofer-${i + 1}`,
+    nombre: c.nombre,
+    cedula: `000000000${i + 1}${i + 1}`.slice(-11),
+    telefono: `809555010${i + 1}`,
+    direccion: `Calle Ejemplo ${i + 1}, Santo Domingo`,
+    licencia: `Cat. 4 · DEMO-${1000 + i}`,
+    licenciaVence: sumarDias(hoy, c.licenciaDias),
+    contactoNombre: `Contacto de ejemplo ${i + 1}`,
+    contactoTelefono: `829555011${i + 1}`,
+    vehiculoId: vehiculos[i % vehiculos.length].id,
+    fechaIngreso: sumarDias(hoy, -(400 + i * 97)),
+    notas: '',
+  }));
 
   const rutas = [
-    { nombre: 'R1 Alcarrizos – ZF Las Américas', origen: 'Los Alcarrizos', destino: 'Zona Franca Las Américas', duracionMin: 55 },
-    { nombre: 'R2 Villa Mella – Haina', origen: 'Villa Mella', destino: 'Parque Industrial Haina', duracionMin: 70 },
-    { nombre: 'R3 SDE – ZF San Isidro', origen: 'Santo Domingo Este', destino: 'Zona Franca San Isidro', duracionMin: 35 },
-    { nombre: 'R4 Herrera – Naco', origen: 'Herrera', destino: 'Ensanche Naco', duracionMin: 40 },
-    { nombre: 'R5 Boca Chica – AILA', origen: 'Boca Chica', destino: 'Aeropuerto Las Américas', duracionMin: 25 },
+    { nombre: 'R1 Alcarrizos – ZF Las Américas', origen: 'Los Alcarrizos', destino: 'Zona Franca Las Américas', duracionMin: 55, horarios: ['05:30', '15:30'], cliente: 'Cliente de ejemplo A' },
+    { nombre: 'R2 Villa Mella – Haina', origen: 'Villa Mella', destino: 'Parque Industrial Haina', duracionMin: 70, horarios: ['05:45', '17:00'], cliente: 'Cliente de ejemplo B' },
+    { nombre: 'R3 SDE – ZF San Isidro', origen: 'Santo Domingo Este', destino: 'Zona Franca San Isidro', duracionMin: 35, horarios: ['06:15'], cliente: 'Cliente de ejemplo A' },
+    { nombre: 'R4 Herrera – Naco', origen: 'Herrera', destino: 'Ensanche Naco', duracionMin: 40, horarios: ['13:30'], cliente: 'Cliente de ejemplo C' },
+    // 11:40 p. m. + 25 min → cruza la medianoche.
+    { nombre: 'R5 Boca Chica – AILA', origen: 'Boca Chica', destino: 'Aeropuerto Las Américas', duracionMin: 25, horarios: ['23:40'], cliente: 'Cliente de ejemplo D' },
   ].map((x, i) => ({ ...x, ...ej, id: `ej-ruta-${i + 1}` }));
 
-  const vehiculos = [
-    { placa: 'I045821', descripcion: 'Toyota Coaster 2019 · 30 pasajeros', estado: 'disponible' },
-    { placa: 'I067310', descripcion: 'Hyundai County 2021 · 29 pasajeros', estado: 'disponible' },
-    { placa: 'I052984', descripcion: 'Nissan Urvan 2018 · 15 pasajeros', estado: 'disponible' },
-  ].map((x, i) => ({ ...x, ...ej, id: `ej-vehiculo-${i + 1}` }));
-
-  // Plan diario: [ruta, salida, chofer, vehículo]. El último viaje cruza la medianoche.
-  const plan = [
-    [0, '05:30', 0, 0], [1, '05:45', 1, 1], [2, '06:15', 2, 2],
-    [3, '13:30', 2, 2], [0, '15:30', 0, 0], [1, '17:00', 1, 1],
-    [4, '23:40', 0, 0],
-  ];
+  // Quién cubre cada horario: [ruta, chofer, vehículo].
+  const asignacion = { 'R1-05:30': [0, 0], 'R1-15:30': [0, 0], 'R2-05:45': [1, 1], 'R2-17:00': [1, 1], 'R3-06:15': [2, 2], 'R4-13:30': [3, 3], 'R5-23:40': [4, 3] };
 
   const viajes = [];
-  const ahoraT = ahora.getTime();
   for (let d = -13; d <= 0; d++) {
     const dia = sumarDias(hoy, d);
     const domingo = diaSemana(dia) === 0;
-    for (const [ri, salida, ci, vi] of plan) {
-      if (domingo && salida > '06:00' && salida < '23:00') continue;
-      const ruta = rutas[ri];
-      const salidaProg = aISO(dia, salida);
-      const llegadaProg = sumarMinutos(salidaProg, ruta.duracionMin);
-      const retrasado = r() < 0.22;
-      const retraso = retrasado ? entre(7, 38) : entre(-6, 4);
-      const salidaReal = sumarMinutos(salidaProg, retrasado ? entre(0, 12) : entre(-3, 3));
-      const llegadaReal = sumarMinutos(llegadaProg, retraso);
-      const v = {
-        ...ej,
-        id: `ej-viaje-${dia}-${salida}`,
-        rutaId: ruta.id, choferId: choferes[ci].id, vehiculoId: vehiculos[vi].id,
-        salidaProg, llegadaProg, salidaReal: null, llegadaReal: null, motivoRetraso: '',
-      };
-      // Solo se registra lo que ya ocurrió respecto a "ahora".
-      if (new Date(salidaReal).getTime() <= ahoraT) v.salidaReal = salidaReal;
-      if (new Date(llegadaReal).getTime() <= ahoraT) {
-        v.llegadaReal = llegadaReal;
-        if (retraso > config.negocio.toleranciaMin) v.motivoRetraso = MOTIVOS[entre(0, MOTIVOS.length - 1)];
+    rutas.forEach((ruta, ri) => {
+      for (const salida of ruta.horarios) {
+        if (domingo && salida > '06:00' && salida < '23:00') continue;
+        const [ci, vi] = asignacion[`R${ri + 1}-${salida}`];
+        const salidaProg = aISO(dia, salida);
+        const llegadaProg = sumarMinutos(salidaProg, ruta.duracionMin);
+        const retrasado = r() < 0.22;
+        const retraso = retrasado ? entre(7, 38) : entre(-6, 4);
+        const salidaReal = sumarMinutos(salidaProg, retrasado ? entre(0, 12) : entre(-3, 3));
+        const llegadaReal = sumarMinutos(llegadaProg, retraso);
+        const v = {
+          ...ej,
+          id: `ej-viaje-${dia}-${salida}-${ri}`,
+          rutaId: ruta.id, choferId: choferes[ci].id, vehiculoId: vehiculos[vi].id,
+          salidaProg, llegadaProg, salidaReal: null, llegadaReal: null, motivoRetraso: '', notas: '',
+        };
+        // Solo se registra lo que ya ocurrió respecto a "ahora".
+        if (new Date(salidaReal).getTime() <= ahoraT) v.salidaReal = salidaReal;
+        if (new Date(llegadaReal).getTime() <= ahoraT) {
+          v.llegadaReal = llegadaReal;
+          if (retraso > CONFIG.viajes.tolerancia_min) v.motivoRetraso = MOTIVOS_RETRASO[entre(0, MOTIVOS_RETRASO.length - 2)];
+        }
+        viajes.push(v);
       }
-      viajes.push(v);
-    }
+    });
   }
   // Uno de hoy queda "Sin llegada registrada" para que el aviso se vea.
-  const deHoy = viajes.filter((v) => v.llegadaReal && v.id.includes(hoy));
+  const deHoy = viajes.filter((v) => v.llegadaReal && v.id.includes(hoy)).sort((a, b) => a.salidaProg.localeCompare(b.salidaProg));
   const sinLlegada = deHoy[deHoy.length - 1];
   if (sinLlegada) Object.assign(sinLlegada, { llegadaReal: null, motivoRetraso: '' });
 
-  const factor = config.negocio.unidadCombustible === 'litros' ? 3.785 : 1;
-  const precioGalon = 235.1;
+  // Combustible: cargas de tanque lleno cada 3 días por vehículo. El km sube con el uso; el
+  // rendimiento normal (km/gal) es estable, salvo la última carga del County, que sale ~35 % peor
+  // para activar el aviso de combustible alto.
+  const RENDIMIENTO = [24, 22, 30, 32];
+  const KM_DIA = [115, 140, 70, 60];
+  const TIPO = ['Gasoil', 'Gasoil', 'Gasoil', 'Gasolina'];
+  const kmInicial = [128400, 64250, 151900, 87600];
   const combustible = [];
-  for (let d = -13; d <= 0; d++) {
-    const dia = sumarDias(hoy, d);
-    vehiculos.forEach((veh, i) => {
-      if ((d + 13 + i) % 3 !== 0) return;
-      const galones = entre(160, 300) / 10;
+  vehiculos.forEach((veh, i) => {
+    let km = kmInicial[i];
+    const fechas = [];
+    for (let d = -15 + i; d <= 0; d += 3) fechas.push(sumarDias(hoy, d));
+    fechas.forEach((dia, n) => {
+      const horaCarga = `0${6 + (n % 3)}:${String(10 + i * 7).padStart(2, '0')}`;
+      if (new Date(aISO(dia, horaCarga)).getTime() > ahoraT) return;
+      const recorrido = n === 0 ? 0 : KM_DIA[i] * 3 + entre(-25, 25);
+      km += recorrido;
+      const anomalia = i === 1 && n === fechas.length - 1;
+      const rend = anomalia ? RENDIMIENTO[i] * 0.65 : RENDIMIENTO[i] * (1 + entre(-4, 4) / 100);
+      const galones = n === 0 ? 20 : Math.round((recorrido / rend) * 10) / 10;
       combustible.push({
         ...ej,
         id: `ej-combustible-${dia}-${i}`,
-        fecha: dia, vehiculoId: veh.id, choferId: choferes[i].id,
-        cantidad: Math.round(galones * factor * 10) / 10,
-        monto: Math.round(galones * precioGalon * 100) / 100,
-        notas: '',
+        fecha: dia, hora: horaCarga, vehiculoId: veh.id, choferId: choferes[i].id,
+        cantidad: galones, monto: Math.round(galones * PRECIO_GALON[TIPO[i]] * 100) / 100,
+        tipo: TIPO[i], km, estacion: `Estación de ejemplo ${i + 1}`, tanqueLleno: true, fotoId: null,
       });
     });
-  }
+    // Mantenimiento por kilometraje a 350 km del último registro → aviso de mantenimiento.
+    if (veh.mantenimientoKm === null) veh.mantenimientoKm = km + 350;
+  });
 
   const turnos = [];
   for (let d = -13; d <= 0; d++) {
     const dia = sumarDias(hoy, d);
     choferes.forEach((c, i) => {
-      if (c.estado !== 'activo' || diaSemana(dia) === 0) return;
-      const entrada = aISO(dia, i === 2 ? '12:45' : '05:00');
+      if (diaSemana(dia) === 0) return;
+      const entrada = aISO(dia, i === 3 ? '12:45' : '05:00');
       const salida = sumarMinutos(entrada, 9 * 60 + entre(-20, 40));
       if (new Date(entrada).getTime() > ahoraT) return;
       turnos.push({
@@ -133,9 +166,9 @@ export async function sembrar(ahora = new Date()) {
     });
   }
 
+  await store.createMany('vehiculos', vehiculos);
   await store.createMany('choferes', choferes);
   await store.createMany('rutas', rutas);
-  await store.createMany('vehiculos', vehiculos);
   await store.createMany('viajes', viajes);
   await store.createMany('combustible', combustible);
   await store.createMany('turnos', turnos);
@@ -155,7 +188,7 @@ export async function referenciasReales() {
     for (const x of await store.list(c, { archivados: 'todos' })) if (x.ejemplo) ids.add(x.id);
   }
   let n = 0;
-  for (const c of ['viajes', 'combustible', 'turnos']) {
+  for (const c of ['viajes', 'combustible', 'turnos', 'choferes']) {
     for (const x of await store.list(c, { archivados: 'todos' })) {
       if (!x.ejemplo && [x.rutaId, x.choferId, x.vehiculoId].some((id) => ids.has(id))) n++;
     }
@@ -166,8 +199,9 @@ export async function referenciasReales() {
 export async function borrarDatosEjemplo() {
   let total = 0;
   for (const c of store.COLECCIONES) {
-    const ids = (await store.list(c, { archivados: 'todos' })).filter((x) => x.ejemplo).map((x) => x.id);
-    total += await store.removeMany(c, ids);
+    const items = (await store.list(c, { archivados: 'todos' })).filter((x) => x.ejemplo);
+    for (const x of items) if (x.fotoId) await store.borrarFoto(x.fotoId);
+    total += await store.removeMany(c, items.map((x) => x.id));
   }
   return total;
 }

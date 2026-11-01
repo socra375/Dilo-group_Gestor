@@ -1,6 +1,7 @@
 // Enrutador por hash (#/viajes?fecha=…): funciona en GitHub Pages sin configurar el servidor.
 // Cada módulo exporta por defecto { titulo, pestana, render(el, params) }; render puede devolver una función de limpieza.
-import { config } from '../config.js';
+import { CONFIG } from '../config.js';
+import { EXTENSIONES } from './esquemas.js';
 import { reduceMotion } from './ui.js';
 
 const RUTAS = {
@@ -15,9 +16,9 @@ const RUTAS = {
   ajustes: () => import('../modules/ajustes.js'),
 };
 
-// Extensiones activas en config (sueldos, mantenimiento…): src/modules/extensiones/<id>/index.js
-for (const ext of config.extensiones) {
-  if (ext.activo) RUTAS[ext.id] = () => import(`../modules/extensiones/${ext.id}/index.js`);
+// Extensiones activas en CONFIG.modulos (sueldos, mapa…): src/modules/extensiones/<carpeta>/index.js
+for (const ext of EXTENSIONES) {
+  if (ext.activo) RUTAS[ext.carpeta] = () => import(`../modules/extensiones/${ext.carpeta}/index.js`);
 }
 
 let limpiar = null;
@@ -64,7 +65,7 @@ async function mostrar(animar = true) {
   vista.replaceChildren(nueva);
 
   document.getElementById('header-title').textContent = modulo.titulo;
-  document.title = `${modulo.titulo} · ${config.empresa.nombre}`;
+  document.title = `${modulo.titulo} · ${CONFIG.empresa.nombre}`;
   for (const a of document.querySelectorAll('.tabbar a')) {
     if (a.dataset.tab === (modulo.pestana ?? ruta)) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');

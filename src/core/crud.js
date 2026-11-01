@@ -1,6 +1,6 @@
 // Pantalla genérica de lista + buscar + crear + editar + archivar, generada desde config.
 import * as store from '../data/store.js';
-import { camposDe, config } from '../config.js';
+import { camposDe, META, GRUPOS } from './esquemas.js';
 import { abrirFormulario } from './form.js';
 import { esc, icon, vacio, confirmar, toast, conCarga, escalonar } from './ui.js';
 import * as fmt from './format.js';
@@ -75,7 +75,7 @@ export function itemHTML(item, d, accionesHTML = '') {
  *   cabecera(refs) → HTML sobre la lista; textoVacio
  */
 export function pantallaCrud(op) {
-  const meta = config.modulos[op.modulo];
+  const meta = META[op.modulo];
   const campos = camposDe(op.modulo);
   const describir = op.describir || describirPorDefecto(campos);
   const buscables = campos.filter((c) => c.buscable);
@@ -165,7 +165,7 @@ export function pantallaCrud(op) {
           campos,
           valores: item ? (op.alEditar ? op.alEditar(item) : item) : op.valoresNuevos?.(refs) || {},
           refs,
-          grupos: op.grupos,
+          grupos: { ...GRUPOS, ...op.grupos },
           acciones,
           validarExtra: op.validarExtra,
           alCambiar: op.alCambiar ? (v, form, campo) => op.alCambiar(v, form, campo, refs) : undefined,

@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Control de Transporte</title>
+  <title>Dilo group · Control de Transporte</title>
   <meta name="description" content="Control de viajes, choferes, rutas y combustible para supervisión de transporte de personal.">
-  <meta name="theme-color" content="#f2f4f7" id="theme-color">
+  <meta name="theme-color" content="#12334A" id="theme-color">
   <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Transporte">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -27,8 +27,10 @@
     // Aplica tema y tamaño de letra antes de pintar para evitar parpadeo.
     try {
       var p = JSON.parse(localStorage.getItem('ct:prefs') || '{}');
-      if (p.tema === 'claro' || p.tema === 'oscuro') document.documentElement.dataset.theme = p.tema;
-      if (p.tamanoLetra) document.documentElement.style.fontSize = p.tamanoLetra + 'px';
+      // Mismas reglas que src/core/prefs.js: por defecto claro y letra normal (17 px).
+      document.documentElement.dataset.theme = p.tema === 'oscuro' ? 'oscuro' : 'claro';
+      var px = { normal: 17, grande: 19, extra: 21 }[p.letra];
+      if (px) document.documentElement.style.fontSize = px + 'px';
     } catch (e) {}
   </script>
   <script type="module" src="src/app.js"></script>
@@ -77,7 +79,7 @@
 
   <header class="app-header">
     <div class="app-header__titles">
-      <p class="app-header__company" id="header-company">Control de Transporte</p>
+      <p class="app-header__company" id="header-company">Dilo group</p>
       <h1 class="app-header__title" id="header-title">Inicio</h1>
     </div>
     <button type="button" class="badge-ejemplo" id="badge-ejemplo" hidden><svg class="icon icon--sm" aria-hidden="true"><use href="#i-info"/></svg>Estás viendo datos de ejemplo · Borrar</button>
@@ -85,12 +87,13 @@
   </header>
 
   <main class="app-main" id="main" tabindex="-1">
+    <p class="demo-note" id="demo-note"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-info"/></svg>Modo demostración: guardado solo en este dispositivo</p>
     <div id="view"><p class="muted">Cargando…</p></div>
     <noscript><p>Esta aplicación necesita JavaScript activado.</p></noscript>
   </main>
 
   <nav class="tabbar" aria-label="Principal">
-    <a class="tabbar__brand" href="#/inicio" data-brand><img src="icons/icon.svg" alt="" width="40" height="40"><span id="brand-name">Control de Transporte</span></a>
+    <a class="tabbar__brand" href="#/inicio" data-brand><img src="icons/icon.svg" alt="" width="40" height="40"><span id="brand-name">Dilo group</span></a>
     <a href="#/inicio" data-tab="inicio"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg></span><span>Inicio</span></a>
     <a href="#/viajes" data-tab="viajes"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg></span><span>Viajes</span></a>
     <a href="#/choferes" data-tab="choferes"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg></span><span>Choferes</span></a>

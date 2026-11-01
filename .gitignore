@@ -1,3 +1,5 @@
 node_modules/
 .DS_Store
 qa/capturas/
+# Claves de Supabase (solo la anon/pública). Nunca se suben al repositorio.
+src/config.local.js

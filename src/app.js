@@ -1,29 +1,23 @@
-// Arranque: apariencia, datos de ejemplo, enrutador y service worker.
-import { config } from './config.js';
-import { pref, setPref } from './core/prefs.js';
+// Arranque: apariencia, migración de datos, datos de ejemplo, enrutador y service worker.
+import { CONFIG } from './config.js';
+import { pref, setPref, letraPx } from './core/prefs.js';
 import { icon } from './core/ui.js';
 import { iniciarRouter, ir } from './core/router.js';
 import { sembrarSiPrimeraVez, hayDatosEjemplo } from './data/seed.js';
-import { pedirPersistencia } from './data/store.js';
+import { pedirPersistencia, migrarDesdeLocalStorage } from './data/store.js';
 
 const raiz = document.documentElement;
-const oscuroSistema = window.matchMedia('(prefers-color-scheme: dark)');
 
-export const temaEfectivo = () => {
-  const t = pref('tema');
-  return t === 'sistema' ? (oscuroSistema.matches ? 'oscuro' : 'claro') : t;
-};
+export const temaEfectivo = () => (pref('tema') === 'oscuro' ? 'oscuro' : 'claro');
 
 export function aplicarApariencia() {
-  const tema = pref('tema');
-  if (tema === 'claro' || tema === 'oscuro') raiz.dataset.theme = tema;
-  else delete raiz.dataset.theme;
-  raiz.style.fontSize = `${pref('tamanoLetra')}px`;
-  raiz.style.setProperty('--brand', config.apariencia.colorPrincipal);
-  raiz.style.setProperty('--accent', config.apariencia.colorAcento);
+  raiz.dataset.theme = temaEfectivo();
+  raiz.style.fontSize = `${letraPx()}px`;
+  raiz.style.setProperty('--brand', CONFIG.tema.color);
+  raiz.style.setProperty('--accent', CONFIG.tema.acento);
 
   const oscuro = temaEfectivo() === 'oscuro';
-  document.getElementById('theme-color')?.setAttribute('content', oscuro ? '#0c1218' : '#f2f4f7');
+  document.getElementById('theme-color')?.setAttribute('content', CONFIG.tema.color); // barra del sistema = encabezado
   const b = document.getElementById('tema-rapido');
   if (b) {
     b.innerHTML = icon(oscuro ? 'sun' : 'moon');
@@ -36,15 +30,14 @@ async function actualizarInsignia() {
 }
 
 async function iniciar() {
-  document.getElementById('header-company').textContent = config.empresa.nombre;
-  document.getElementById('brand-name').textContent = config.empresa.nombre;
+  document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
+  document.getElementById('brand-name').textContent = CONFIG.empresa.nombre;
   // Altura real de la cabecera para los títulos de día "pegajosos" (cambia con la franja de ejemplo y la letra).
   const cabecera = document.querySelector('.app-header');
   new ResizeObserver(() => raiz.style.setProperty('--header-h', `${cabecera.offsetHeight}px`)).observe(cabecera);
   aplicarApariencia();
-  oscuroSistema.addEventListener('change', aplicarApariencia);
   window.addEventListener('prefs', (e) => {
-    if (['tema', 'tamanoLetra'].includes(e.detail.clave)) aplicarApariencia();
+    if (['tema', 'letra'].includes(e.detail.clave)) aplicarApariencia();
   });
 
   document.getElementById('tema-rapido').addEventListener('click', () => {
@@ -58,9 +51,10 @@ async function iniciar() {
   });
 
   try {
+    await migrarDesdeLocalStorage();
     await sembrarSiPrimeraVez();
   } catch (e) {
-    console.error('No se pudieron cargar los datos de ejemplo', e);
+    console.error('No se pudieron preparar los datos', e);
   }
   await actualizarInsignia();
   let pendiente = null;

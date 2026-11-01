@@ -1,12 +1,14 @@
-# Control de Transporte
+# Dilo group · Control de Transporte
 
 [![CI](https://github.com/socra375/Transpo-IA/actions/workflows/ci.yml/badge.svg)](https://github.com/socra375/Transpo-IA/actions/workflows/ci.yml)
 
 Web app móvil para **un supervisor** de transporte de personal en República Dominicana: viajes y retrasos, choferes y turnos, rutas, vehículos, combustible y reportes. Funciona sin internet una vez instalada.
 
 - HTML + CSS + JavaScript (módulos ES). **Sin framework y sin build**: los archivos se publican tal cual.
-- Datos en el teléfono (localStorage) detrás de una capa (`src/data/store.js`) lista para cambiar a Supabase.
-- Todo lo que el cliente aún no confirmó vive en **`src/config.js`** (ver [DECISIONES.md](DECISIONES.md)).
+- Datos en el teléfono (**IndexedDB**, con fotos) detrás de una capa (`src/data/store.js`) lista para cambiar a Supabase.
+- ⚠️ **Modo demostración**: no ingreses datos reales (cédulas, direcciones, fotos) hasta completar la fase 8 (autenticación + RLS).
+- Software propietario: ver [LICENSE.md](LICENSE.md).
+- Qué está activo vive en **`src/config.js`**; cómo es cada campo, en `src/core/esquemas.js` (ver [DECISIONES.md](DECISIONES.md)).
 
 ## Probar en tu computadora
 
@@ -45,22 +47,22 @@ Todas las rutas son relativas y la navegación usa `#/pantalla`, así que no hay
 - **iPhone (Safari):** botón Compartir → *Agregar a pantalla de inicio*.
 - **Android (Chrome):** menú ⋮ → *Instalar app*.
 
-> ⚠️ **Importante para los datos.** Mientras se use localStorage, los datos existen **solo en ese teléfono**. En iPhone, Safari borra los datos de un sitio que no se abre en 7 días **si no está instalado** en la pantalla de inicio. Instálala y exporta un respaldo semanal (*Ajustes → Exportar respaldo*); Inicio avisa cuando toca.
+> ⚠️ **Importante para los datos.** Mientras no exista la fase 8 (Supabase), los datos existen **solo en ese teléfono**. En iPhone, Safari borra los datos de un sitio que no se abre en 7 días **si no está instalado** en la pantalla de inicio. Instálala y exporta un respaldo semanal (*Ajustes → Exportar respaldo*); Inicio avisa cuando toca.
 
 ## Configurar (respuestas del cliente)
 
-Todo está en `src/config.js`:
+Qué está activo se decide en `src/config.js` (`CONFIG`); cómo es cada campo, en `src/core/esquemas.js`. **Cambiar un campo es editar una línea**:
 
 | Quiero… | Edito |
 |---|---|
-| Cambiar nombre de la empresa | `empresa.nombre` |
-| Cambiar color principal / acento | `apariencia.colorPrincipal`, `apariencia.colorAcento` (el tema oscuro se deriva solo) |
-| Tema y letra por defecto | `apariencia.tema`, `apariencia.tamanoLetra` |
-| Tolerancia de retraso | `negocio.toleranciaMin` (el usuario también la cambia en Ajustes) |
-| Litros en vez de galones | `negocio.unidadCombustible: 'litros'` |
-| Ocultar o pedir un campo | `modulos.<módulo>.campos[].activo` / `requerido` |
-| Qué sale en Inicio | `inicio.bloques`, `inicio.totales`, `inicio.avisos` |
-| Formato de placa | `modulos.vehiculos.campos` → `patron` y `mensajePatron` |
+| Cambiar el nombre de la empresa | `CONFIG.empresa.nombre` |
+| Cambiar color principal / acento | `CONFIG.tema.color`, `CONFIG.tema.acento` (el tema oscuro se deriva solo) |
+| Tema y letra por defecto | `CONFIG.tema.modo` (`claro`/`oscuro`), `CONFIG.tema.letra` (`normal`/`grande`/`extra`) |
+| Tolerancia de retraso | `CONFIG.viajes.tolerancia_min` (el usuario también la cambia en Ajustes) |
+| Ocultar o mostrar un campo | `CONFIG.<módulo>.campos.<campo>: true/false` (p. ej. `CONFIG.rutas.campos.km = true`) |
+| Hacer un campo obligatorio, cambiar su etiqueta o validación | su entrada en `src/core/esquemas.js` (`requerido`, `etiqueta`, `patron`…) |
+| Encender o apagar un aviso | `CONFIG.avisos.<aviso>` |
+| Activar un módulo futuro | `CONFIG.modulos.<id>: true` + su `index.js` en `src/modules/extensiones/<carpeta>/` |
 
 Si cambias el color principal, regenera los íconos (`icons/icon.svg` → `node scripts/iconos.cjs`) y actualiza `theme_color` en `manifest.webmanifest`.
 
@@ -70,7 +72,8 @@ Si cambias el color principal, regenera los íconos (`icons/icon.svg` → `node 
 index.html, manifest.webmanifest, sw.js
 icons/                    íconos de la PWA (SVG fuente + PNG)
 src/app.js                arranque: apariencia, datos de ejemplo, router, service worker
-src/config.js             TODO lo configurable
+src/config.js             CONFIG del cliente: qué está activo
+src/core/esquemas.js      campos de cada módulo (tipo, etiqueta, validación)
 src/data/store.js         capa de datos (list, get, create, update, remove)
 src/data/seed.js          datos de ejemplo
 src/core/router.js        rutas por hash

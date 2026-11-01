@@ -1,73 +1,64 @@
-# Decisiones tomadas por defecto
+# Decisiones — Dilo group · Control de Transporte
 
-Lo que el cliente aún no confirmó se decidió así. Lo marcado **(config)** se cambia en `src/config.js` sin tocar código.
+Fuente: cuestionario respondido por el cliente (William Jiménez). Todo lo configurable está en `src/config.js`
+(qué está activo) y `src/core/esquemas.js` (cómo es cada campo).
 
-## Arquitectura
+## Confirmado por el cliente
+
+- **Diseño "Claro y limpio"**: fondo claro, encabezado azul marino `#12334A`, acento ámbar `#F2A900`, tarjetas blancas. Letra normal (17 px), con grande (19) y extra grande (21) en Ajustes.
+- **Inicio "Resumen con números"**: viajes de hoy, retrasos, combustible (galones), choferes activos, avisos, gráfica de retrasos por día y viajes de hoy.
+- **Hora real escrita a mano** (`CONFIG.viajes.hora_manual`).
+- **Motivo del retraso: "Sí, siempre"** (ver la interpretación en los supuestos).
+- **Choferes**: todos los campos (nombre, cédula, teléfono, foto, dirección, licencia y vencimiento, contacto de emergencia, vehículo asignado, fecha de ingreso, notas). Botones Llamar y WhatsApp.
+- **Rutas**: nombre, salida, llegada, duración normal, horarios fijos y cliente. **Sin** kilómetros, paradas ni tarifa (definidos pero apagados en `CONFIG.rutas.campos`).
+- **Vehículos**: placa, descripción, estado, seguro y próximo mantenimiento.
+- **Combustible**: fecha y hora, vehículo, chofer, galones, monto en RD$, tipo (Gasoil, Gasolina), kilometraje, estación y foto del recibo.
+- **Reportes**: retrasos por chofer y por ruta, combustible por semana/mes y por vehículo, resumen diario. Entrega por **WhatsApp**; CSV como extra.
+- **Avisos**: viaje retrasado, licencia por vencer, combustible más alto de lo normal, mantenimiento pendiente y (extra pedido en "qué le da trabajo") seguro por vencer.
+- **A futuro, fuera de alcance**: sueldos, mantenimiento completo, limpieza y servicios, mapa, acceso para choferes. Hay un punto de extensión por cada uno en `src/modules/extensiones/` y `CONFIG.modulos` (en `false`).
+- Moneda RD$, unidades en galones, zona `America/Santo_Domingo`.
+
+## Supuestos por confirmar
+
+Cada uno se cambia sin tocar la lógica, en el lugar indicado.
+
+| Supuesto | Valor actual | Dónde se cambia |
+|---|---|---|
+| Nombre en el encabezado | "Dilo group" (¿"Dilo Group"?) | `CONFIG.empresa.nombre` |
+| Tolerancia de retraso (no respondió) | 5 minutos | `CONFIG.viajes.tolerancia_min` y Ajustes |
+| Atajo "Ahora" junto a la hora real: rellena el campo, no guarda | activo | `CONFIG.viajes.atajo_ahora` |
+| "Sí, siempre" = motivo **obligatorio cuando el viaje queda Retrasado**; si no hay retraso, el campo no aparece | activo | `CONFIG.viajes.motivo` |
+| Motivos rápidos en chips (el chofer elige o escribe "Otro"), para que obligatorio no signifique escribir "no sé" | Tráfico, Lluvia, Avería, Accidente en la vía, Pasajeros tarde, Otro | `MOTIVOS_RETRASO` en `esquemas.js` |
+| Módulo de asistencia del chofer (lo mencionó en la llamada, no en el cuestionario) | activo | `CONFIG.modulos.asistencia` |
+| "Choferes activos" = choferes no archivados (el cuestionario no pide un campo "estado" para choferes) | — | `esquemas.js` si se quiere un estado |
+| Rendimiento km/galón: solo entre cargas de **tanque lleno** (si una carga no llenó el tanque, el cálculo da números falsos y dispararía el aviso de combustible alto) | casilla "Tanque lleno", marcada por defecto | fase 4 |
+| Formato de placa RD (1–2 letras + 5–6 dígitos) | patrón de validación | `esquemas.js` → `vehiculos.placa.patron` |
+| Respaldo recomendado cada 7 días; turno abierto largo a las 12 h | 7 días / 12 h | `PARAMETROS` en `esquemas.js` |
+| Precios de combustible en los datos de ejemplo | Gasoil RD$235.10, Gasolina RD$272.50 por galón | `src/data/seed.js` |
+| `renta_vehiculos` y `facturacion` quedan en `CONFIG.modulos` (venían en la config pegada) pero **sin** carpeta de extensión, porque no los pidió | `false` | — |
+
+## Decisiones técnicas
 
 | # | Decisión | Por qué |
-|---|----------|---------|
-| A1 | La interfaz de `store.js` es **asíncrona** (devuelve Promises) aunque localStorage sea síncrono. | Supabase es asíncrono. Si hoy fuera síncrona, migrar obligaría a tocar todos los módulos. |
-| A2 | Las horas se guardan como **instantes ISO UTC completos** (`2026-10-26T13:30:00.000Z`), no como "HH:MM". | El cruce de medianoche se resuelve una vez, al capturar la hora. Después el retraso es una resta. |
-| A3 | La zona horaria del negocio (`America/Santo_Domingo`) se aplica siempre, sin importar la zona del teléfono. **(config)** | Un teléfono mal configurado no debe mover los viajes de día. |
-| A4 | Rutas por **hash** (`#/viajes`). | Funciona en GitHub Pages sin configurar el servidor ni una página 404. |
-| A5 | Archivos añadidos a la estructura pedida: `src/app.js` (arranque), `src/core/form.js` (formularios desde config), `src/core/crud.js` (lista/buscar/crear/editar/archivar genérico), `src/core/prefs.js` (ajustes del dispositivo), `src/modules/mas.js` (pestaña "Más"), `scripts/` (servidor local y QA). | Evita repetir la misma lógica en cada módulo. |
-| A6 | Las **preferencias del dispositivo** (tema, letra, tolerancia) viven en `prefs.js`, fuera del store. | Son de este teléfono. Al migrar a Supabase no hace falta una tabla para ellas. Si la tolerancia debe compartirse entre dispositivos, se mueve a una tabla `ajustes`. |
-| A7 | Campos marcados `fijo: true` en config (p. ej. llegada programada) ignoran `activo: false`. | La lógica de retrasos no funciona sin ellos. |
-| A8 | Se pide `navigator.storage.persist()` al arrancar. | En iPhone, Safari puede borrar los datos de un sitio que no se abre en 7 días si **no** está instalado en la pantalla de inicio. Instalarlo como PWA y hacer respaldos es la protección real. |
+|---|---|---|
+| T1 | La app se **evolucionó** desde la versión anterior (mismo repositorio, mismas pruebas), no se reescribió. | Conserva la lógica de retrasos y las pruebas que ya cazaron errores reales. |
+| T2 | `store.js` usa **IndexedDB** (antes localStorage) con la interfaz `list / get / create / update / archive / remove`, toda **asíncrona**. | Habrá fotos (localStorage no las soporta bien) y Supabase también es asíncrono: al migrar se cambia solo ese archivo. |
+| T3 | Las **fotos** van en un almacén aparte (`fotos`) y los registros guardan solo su `fotoId`. | Las listas no cargan imágenes; al migrar, ese almacén se convierte en un bucket privado de Supabase Storage. |
+| T4 | Si la versión anterior dejó datos en localStorage, se copian **una vez** a IndexedDB y se borran las claves viejas. | Quien ya usaba la versión publicada no encuentra la app vacía. |
+| T5 | `CONFIG` (pegado tal cual) solo dice qué está activo; los **tipos, etiquetas y validaciones** de cada campo están en `src/core/esquemas.js` (archivo agregado a la estructura pedida). Formularios y listas se generan de ahí. | El `CONFIG` de la especificación no trae tipos; mezclar ambos lo haría ilegible. |
+| T6 | Las horas se guardan como **instantes ISO UTC**; la zona del negocio se aplica siempre, sin importar la zona del teléfono. | El cruce de medianoche se resuelve una vez, al capturar. |
+| T7 | Rutas por **hash** (`#/viajes`). | Funciona en GitHub Pages sin configurar el servidor. |
+| T8 | Archivos agregados a la estructura pedida: `src/app.js`, `src/core/esquemas.js`, `src/core/form.js`, `src/core/crud.js`, `src/core/prefs.js`, `src/core/agregados.js`, `src/modules/mas.js` y `scripts/` (servidor local, QA, e2e, íconos). | Evitan repetir lógica en cada módulo y automatizan las pruebas. |
+| T9 | **Tipografías**: se mantienen Barlow Semi Condensed (títulos) y Atkinson Hyperlegible (lectura) en lugar de las sugeridas "por ejemplo" (Barlow Condensed / Source Sans 3). | Atkinson está diseñada para máxima legibilidad, útil al sol; Barlow Semi Condensed es la misma familia, un poco más ancha y legible. |
+| T10 | **Tema**: claro por defecto; el oscuro se activa con el interruptor de Ajustes (y con un botón rápido en el encabezado). Ya no sigue al tema del sistema. | Lo pide la especificación ("por defecto claro"). |
+| T11 | `config.example.js` va en la raíz y se copia como `src/config.local.js` (ignorado por git). | **Riesgo de la fase 8**: con "Deploy from a branch", un archivo ignorado nunca llega a GitHub Pages. Publicar con Supabase requerirá generar ese archivo en un flujo de Actions a partir de una variable del repositorio. |
+| T12 | Escritorio: con mouse y ≥ 768 px, la barra inferior pasa a un riel lateral de íconos que se despliega al pasar el mouse. En el celular se mantiene la barra inferior. | Pedido del dueño del repositorio; en pantallas táctiles no existe el hover. |
+| T13 | Mientras no exista la fase 8, la app muestra "Modo demostración: guardado solo en este dispositivo". **No se deben ingresar datos reales** (cédulas, direcciones, fotos) hasta tener autenticación y RLS. | Lo exige la especificación; el código y los datos de ejemplo son visibles para quien abra el enlace. |
+| T14 | Sin "eliminar" en las listas: **archivar** (borrado lógico) con filtro "Archivados" para verlos y restaurarlos. | Así no se rompen viajes o cargas que apunten al registro. |
+| T15 | Horas en 12 h con a. m./p. m.; fechas **dd/mm/aaaa** (la fecha larga solo en títulos); dinero RD$ con separador de miles. | Formato pedido. |
 
-## Interfaz
-
-| # | Decisión |
-|---|----------|
-| U1 | Barra inferior de 5 pestañas: **Inicio, Viajes, Choferes, Combustible, Más**. "Más" contiene Rutas, Vehículos, Reportes y Ajustes (y extensiones futuras). Son las que se usan a diario en la calle. |
-| U2 | Fuentes: **Barlow Semi Condensed** (títulos; condensada, estilo rotulación vial, y cabe en pantallas estrechas) y **Atkinson Hyperlegible** (lectura; diseñada para máxima legibilidad, útil al sol). Letra base 17 px. **(config)** |
-| U3 | Color principal azul `#0F4C81` y acento ámbar `#F5A524`. El tema oscuro **deriva** el principal automáticamente (`color-mix`). Cambiar el color es una sola línea. **(config)** |
-| U4 | El aviso "Datos de ejemplo" es una franja visible bajo el encabezado en todas las pantallas. Lleva a Ajustes, donde se borran todos de una vez. |
-| U5 | Botón rápido de tema claro/oscuro en el encabezado (útil al pasar del sol a la noche). En Ajustes también está la opción "Sistema". |
-| U6 | Formularios en **hoja inferior** (`<dialog>` nativo: atrapa el foco y cierra con Esc o gesto atrás). En pantallas táctiles no se enfoca el primer campo al abrir, para que el teclado no tape la hoja. |
-| U7 | El esqueleto de carga solo aparece si los datos tardan más de 150 ms. Con localStorage casi nunca se ve; con Supabase sí. |
-| U8 | En las listas no hay "eliminar", solo **archivar/restaurar** (como pidió el cliente). Así no se rompen viajes o cargas que apunten al registro. |
-
-| U9 | **Menú lateral en escritorio.** Con mouse y ancho ≥ 768 px (`hover: hover` + `pointer: fine`), la barra inferior pasa a un riel a la izquierda con solo íconos y el logo. Al pasar el mouse (o enfocar con el teclado) se despliega sobre el contenido, sin empujarlo, con el nombre de la empresa y las secciones. En el celular y en tablets táctiles se mantiene la barra inferior, porque ahí no existe el hover y un riel sin nombres sería peor. Es el mismo `<nav>` reubicado con CSS: el router, las pestañas y los avisos no cambian. |
-
-## Validaciones (config)
+## Validaciones
 
 - Teléfono: 10 dígitos que empiezan por 809, 829 u 849.
-- Cédula: 11 dígitos. Se muestra como `001-1234567-8`. No se valida el dígito verificador: algunas cédulas antiguas no lo cumplen.
-- Placa: 1–2 letras + 5–6 dígitos (`I045821`). Patrón editable en config.
-
-## Reglas de negocio interpretadas
-
-| # | Decisión | Alternativa si el cliente prefiere otra cosa |
-|---|----------|------|
-| N1 | El prompt mezcla estado y puntualidad. Se separaron: **estado** = Programado → En ruta → Completado (o *Sin llegada registrada*); **puntualidad** (solo completados) = *A tiempo* o *Retrasado (+N min)*. Un viaje completado muestra dos chips: "Completado" y "A tiempo"/"Retrasado". | Mostrar un solo chip: cambiar `chipsEstado()` en `viajes.js`. |
-| N2 | "Sin llegada registrada" se aplica en cuanto pasa la llegada programada, **sin** tolerancia (regla literal). | Sumar la tolerancia en `estadoViaje()` (`time.js`) y en su prueba. |
-| N3 | Llegar antes de tiempo cuenta como "A tiempo" (retraso negativo). Retraso **igual** a la tolerancia = a tiempo; solo cuenta si la **supera**. | — |
-| N4 | Un viaje programado cuya hora de salida pasó sin marcarse muestra "Salida pendiente". El retraso solo se mide por la llegada, como pide el prompt. | Medir también el retraso de salida. |
-| N5 | Cruce de medianoche al capturar: la **llegada programada** que es menor que la salida cae al día siguiente. Las **horas reales** se asignan al día más cercano a la hora programada (±12 h). | — |
-| N6 | Un viaje pertenece al día de su **salida programada**. Inicio también muestra los viajes de **ayer** aún abiertos (p. ej. el de las 11:40 p. m.). | — |
-| N7 | Al pulsar "Llegó ahora" con retraso, se abre una hoja corta para el motivo. Es opcional: se puede omitir. | Quitarla: `activo: false` en el campo `motivoRetraso`. |
-| N8 | Turnos: se permiten **varios turnos por día** (turno partido). Un turno sin salida sigue abierto aunque cambie el día (turnos nocturnos). Si un turno abierto supera `horasTurnoLargo` (12 h), sale un aviso de que quizá falta marcar la salida. | — |
-| N9 | Los viajes y cargas **archivados** no cuentan en Inicio ni en Reportes. | — |
-| N10 | Reportes: la puntualidad se calcula solo con viajes completados. "Sin llegada" se reporta aparte (no se adivina su retraso). | — |
-| N11 | Combustible: la cantidad y el monto se registran; el precio por unidad se calcula (monto ÷ cantidad) y se muestra. | Pedir precio por galón y calcular el monto. |
-| N12 | Avisos de Inicio: sin llegada (hoy y ayer), salidas pendientes, licencias vencidas o que vencen en ≤ 30 días, turnos de más de 12 h y respaldo con más de 7 días (solo cuando ya hay datos reales). Cada uno se enciende o apaga en `config.inicio.avisos`. | — |
-| N13 | Al borrar los datos de ejemplo, los registros del usuario que apuntaban a ellos se conservan y muestran "(eliminado)". La confirmación avisa cuántos hay. | Bloquear el borrado o convertir esos ejemplos en datos reales. |
-
-## Datos, respaldo y PWA
-
-| # | Decisión |
-|---|----------|
-| D1 | Respaldo en JSON con `{ app, formato, version, exportado, datos }`. Al importar se valida el formato y se pide confirmación, porque **reemplaza** todo. |
-| D2 | CSV con BOM UTF-8, separador coma y números sin formato (RD$ en el encabezado), para que Excel en español muestre bien las tildes y pueda sumar. |
-| D3 | Service worker: los archivos propios salen de la caché y se actualizan en segundo plano; las fuentes de Google se guardan al usarse. Hay que subir `VERSION` en `sw.js` en cada publicación. |
-| D4 | Datos de ejemplo: 4 choferes (uno de vacaciones y uno con licencia por vencer), 5 rutas de Santo Domingo, 3 autobuses, 14 días con 7 viajes diarios (menos los domingos) y ~22 % con retraso, cargas de gasoil a RD$235.10/gal (precio supuesto) y turnos. Se generan relativos al día de instalación y con semilla fija. |
-
-## Preguntas para el cliente (lo que más cambiaría la app)
-
-1. ¿Uno o varios supervisores/teléfonos? Con más de uno, localStorage no sirve: hay que migrar a Supabase antes de usarla en serio.
-2. ¿El retraso se mide solo por la llegada, o también importa la salida tardía?
-3. ¿"Sin llegada registrada" debe esperar la tolerancia?
-4. ¿Galones o litros? ¿Se paga por monto o por precio por galón?
-5. ¿Qué es lo primero que quiere ver al abrir la app (Inicio)?
-6. Nombre de la empresa, color de marca y logo.
+- Cédula: 11 dígitos, se aceptan guiones; se muestra como `001-1234567-8`. (Fase 2: si no cumple, **solo advierte**, no bloquea.)
+- Placa: 1–2 letras + 5–6 dígitos.

@@ -1,6 +1,6 @@
 // Ajustes del dispositivo, respaldo (exportar/importar JSON) y datos de ejemplo.
 import * as store from '../data/store.js';
-import { config } from '../config.js';
+import { VERSION_APP } from '../core/esquemas.js';
 import { pref, setPref } from '../core/prefs.js';
 import { hoyClave, fechaClave } from '../core/time.js';
 import * as fmt from '../core/format.js';
@@ -9,16 +9,15 @@ import { hayDatosEjemplo, borrarDatosEjemplo, referenciasReales } from '../data/
 import { refrescar } from '../core/router.js';
 
 const FORMATO = 1;
-const TEMAS = [['claro', 'Claro'], ['oscuro', 'Oscuro'], ['sistema', 'Sistema']];
-const NOMBRES_LETRA = ['Pequeña', 'Normal', 'Grande', 'Muy grande'];
+const LETRAS = [['normal', 'Normal'], ['grande', 'Grande'], ['extra', 'Extra grande']];
 
-const segmentado = (nombre, opciones, actual) => `<div class="segmented" role="group" aria-label="${esc(nombre)}">${opciones
-  .map(([v, t]) => `<button type="button" data-${nombre === 'Tema' ? 'tema' : 'letra'}="${v}" aria-pressed="${String(v) === String(actual)}">${esc(t)}</button>`)
+const segmentadoLetra = (actual) => `<div class="segmented" role="group" aria-label="Tamaño de letra">${LETRAS
+  .map(([v, t]) => `<button type="button" data-letra="${v}" aria-pressed="${v === actual}">${esc(t)}</button>`)
   .join('')}</div>`;
 
 async function exportarRespaldo() {
   const datos = await store.exportAll();
-  const respaldo = { app: 'control-transporte', formato: FORMATO, version: config.version, exportado: new Date().toISOString(), datos };
+  const respaldo = { app: 'control-transporte', formato: FORMATO, version: VERSION_APP, exportado: new Date().toISOString(), datos };
   descargar(`control-transporte-respaldo-${hoyClave()}.json`, JSON.stringify(respaldo, null, 2), 'application/json');
   setPref('ultimoRespaldo', respaldo.exportado);
   toast('Respaldo descargado. Guárdalo fuera del teléfono (correo, Drive o WhatsApp).', 'ok', 4200);
@@ -55,13 +54,13 @@ export default {
     const ultimo = pref('ultimoRespaldo');
     const persistente = await navigator.storage?.persisted?.().catch(() => false);
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-    const tamanos = config.apariencia.tamanosLetra;
 
     el.innerHTML = `
       <section class="card section" aria-labelledby="t-apariencia">
         <h2 class="section__title" id="t-apariencia">Apariencia</h2>
-        <div class="field"><span class="field__label">Tema</span>${segmentado('Tema', TEMAS, pref('tema'))}</div>
-        <div class="field"><span class="field__label">Tamaño de letra</span>${segmentado('Letra', tamanos.map((t, i) => [t, NOMBRES_LETRA[i] ?? `${t}px`]), pref('tamanoLetra'))}
+        <label class="switch"><span><strong>Modo oscuro</strong><br><small class="muted">Útil de noche. Por defecto, claro.</small></span>
+          <input type="checkbox" role="switch" id="f-oscuro" ${pref('tema') === 'oscuro' ? 'checked' : ''}></label>
+        <div class="field"><span class="field__label">Tamaño de letra</span>${segmentadoLetra(pref('letra'))}
           <p class="field__help">Vista previa: Salida 5:30 a. m. · RD$4,185.00</p></div>
       </section>
 
@@ -99,10 +98,17 @@ export default {
         <dl class="kv">
           <dt>Instalada en inicio</dt><dd>${instalada ? 'Sí' : 'No'}</dd>
           <dt>Almacenamiento protegido</dt><dd>${persistente ? 'Sí' : 'No'}</dd>
-          <dt>Versión</dt><dd>${esc(config.version)}</dd>
+          <dt>Versión</dt><dd>${esc(VERSION_APP)}</dd>
         </dl>
         ${instalada ? '' : `<div class="alert alert--info">${icon('info')}<span class="alert__body"><span class="alert__title">Instálala en la pantalla de inicio</span><span class="alert__text">iPhone: Compartir → “Agregar a inicio”. Android: menú ⋮ → “Instalar app”. Así funciona sin internet y el navegador no borra los datos.</span></span></div>`}
       </section>`;
+
+    el.querySelector('#f-oscuro').addEventListener('change', (e) => setPref('tema', e.target.checked ? 'oscuro' : 'claro'));
+    // El botón rápido del encabezado también cambia el tema: mantener el interruptor al día.
+    const alCambiarPref = (e) => {
+      if (e.detail.clave === 'tema') el.querySelector('#f-oscuro').checked = e.detail.valor === 'oscuro';
+    };
+    window.addEventListener('prefs', alCambiarPref);
 
     const tol = el.querySelector('#f-tolerancia');
     tol.addEventListener('change', () => {
@@ -135,11 +141,8 @@ export default {
     el.addEventListener('click', async (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.dataset.tema) {
-        setPref('tema', b.dataset.tema);
-        el.querySelectorAll('[data-tema]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      } else if (b.dataset.letra) {
-        setPref('tamanoLetra', Number(b.dataset.letra));
+      if (b.dataset.letra) {
+        setPref('letra', b.dataset.letra);
         el.querySelectorAll('[data-letra]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       } else if (b.hasAttribute('data-exportar')) {
         await exportarRespaldo();
@@ -158,5 +161,6 @@ export default {
         refrescar();
       }
     });
+    return () => window.removeEventListener('prefs', alCambiarPref);
   },
 };

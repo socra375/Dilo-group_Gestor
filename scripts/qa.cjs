@@ -90,6 +90,21 @@ async function contraste(page) {
   });
 }
 
+// El tema de la app no sigue al sistema (claro por defecto; oscuro con el interruptor de Ajustes),
+// así que cada pasada fija la preferencia antes de cargar la página.
+async function fijarTema(ctx, tema) {
+  await ctx.addInitScript((oscuro) => {
+    const p = JSON.parse(localStorage.getItem('ct:prefs') || '{}');
+    localStorage.setItem('ct:prefs', JSON.stringify({ ...p, tema: oscuro ? 'oscuro' : 'claro' }));
+  }, tema === 'dark');
+}
+
+// Verifica que la página quedó en el tema esperado (evita "pasadas oscuras" que en realidad son claras).
+async function verificarTema(page, tema) {
+  const actual = await page.evaluate(() => document.documentElement.dataset.theme);
+  return actual === (tema === 'dark' ? 'oscuro' : 'claro');
+}
+
 (async () => {
   fs.mkdirSync(SALIDA, { recursive: true });
   const servidor = crear().listen(0);
@@ -102,6 +117,7 @@ async function contraste(page) {
       viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: tema, reducedMotion: 'reduce',
       locale: 'es-DO', timezoneId: 'America/Santo_Domingo', serviceWorkers: 'allow',
     });
+    await fijarTema(ctx, tema);
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
     const errores = [];
@@ -111,6 +127,10 @@ async function contraste(page) {
 
     await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
     await page.waitForLoadState('networkidle');
+    if (!(await verificarTema(page, tema))) {
+      fallos++;
+      console.log(`✗ ${tema}: la página no quedó en el tema esperado`);
+    }
 
     for (const [nombre, ruta, accion] of PANTALLAS) {
       await page.evaluate((h) => { location.hash = h; }, ruta);
@@ -148,7 +168,7 @@ async function contraste(page) {
     const ctx = await navegador.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: 'reduce', timezoneId: 'America/Santo_Domingo' });
     await ctx.addInitScript(() => {
       const p = JSON.parse(localStorage.getItem('ct:prefs') || '{}');
-      localStorage.setItem('ct:prefs', JSON.stringify({ ...p, tamanoLetra: 21 }));
+      localStorage.setItem('ct:prefs', JSON.stringify({ ...p, letra: 'extra' }));
     });
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
@@ -174,6 +194,7 @@ async function contraste(page) {
   // Escritorio (1280 px, con mouse): riel lateral solo con íconos que se despliega al pasar el mouse.
   for (const tema of ['light', 'dark']) {
     const ctx = await navegador.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: tema, reducedMotion: 'reduce', locale: 'es-DO', timezoneId: 'America/Santo_Domingo' });
+    await fijarTema(ctx, tema);
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
     const errores = [];

@@ -1,6 +1,6 @@
 // Viajes del día: estado calculado, botones rápidos "Salió ahora" / "Llegó ahora", crear/editar/archivar.
 import * as store from '../data/store.js';
-import { camposDe } from '../config.js';
+import { camposDe } from '../core/esquemas.js';
 import { tolerancia } from '../core/prefs.js';
 import {
   aISO, fechaClave, horaClave, hoyClave, sumarDias, horaDespues, horaCercana,
