@@ -5,6 +5,8 @@
 # ORIGEN (opcional): carpeta de donde copiar en vez del repositorio (lo usan las pruebas).
 set -euo pipefail
 destino="${1:?Uso: bash scripts/armar-sitio.sh <carpeta>}"
+mkdir -p "$destino"
+destino="$(cd "$destino" && pwd)"
 raiz="$(cd "$(dirname "$0")/.." && pwd)"
 origen="${ORIGEN:-$raiz}"
 rm -rf "$destino"

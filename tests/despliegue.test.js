@@ -64,18 +64,12 @@ test('armar-sitio: con variables válidas genera config.local.js; con una clave 
   fs.rmSync(destino, { recursive: true, force: true });
 });
 
-test('Cloudflare: el enlace del sitio se escribe en el resumen de la ejecución', () => {
-  const cf = leer('.github/workflows/cloudflare.yml');
-  assert.match(cf, /GITHUB_STEP_SUMMARY/);
-  assert.match(cf, /https:\/\/\$\{PROYECTO\}\.pages\.dev/);
-});
-
-test('flujos de publicación: usan armar-sitio.sh y Cloudflare no falla si aún no está configurado', () => {
-  for (const f of ['.github/workflows/pages.yml', '.github/workflows/cloudflare.yml']) {
-    assert.match(leer(f), /bash scripts\/armar-sitio\.sh _site/, `${f} debe armar el sitio con el script común`);
-  }
-  const cf = leer('.github/workflows/cloudflare.yml');
-  assert.match(cf, /configurado=no/);
-  assert.match(cf, /npm test/, 'Cloudflare publica solo después de las pruebas unitarias');
-  assert.doesNotMatch(cf, /CLOUDFLARE_API_TOKEN:\s*['"]?[A-Za-z0-9_-]{20,}/, 'el token nunca va escrito en el flujo');
+test('Vercel: vercel.json construye con armar-sitio, publica public/ y tiene las cabeceras de caché', () => {
+  const v = JSON.parse(leer('vercel.json'));
+  assert.equal(v.buildCommand, 'bash scripts/armar-sitio.sh public');
+  assert.equal(v.outputDirectory, 'public');
+  const cab = (src) => v.headers.find((h) => h.source === src)?.headers.find((h) => h.key === 'Cache-Control')?.value;
+  assert.equal(cab('/sw.js'), 'no-cache');
+  assert.equal(cab('/index.html'), 'no-cache');
+  assert.ok(v.headers.some((h) => h.headers.some((x) => x.key === 'X-Content-Type-Options' && x.value === 'nosniff')));
 });
