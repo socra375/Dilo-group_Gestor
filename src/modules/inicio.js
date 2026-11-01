@@ -6,7 +6,7 @@ import { pref, tolerancia } from '../core/prefs.js';
 import { hoyClave, sumarDias, fechaClave, estadoViaje, diasEntre } from '../core/time.js';
 import * as fmt from '../core/format.js';
 import { esc, icon, vacio, animarContador, escalonar, conCarga } from '../core/ui.js';
-import { tarjetaViaje, refsViajes, accionRapida, abrirViaje } from './viajes.js';
+import { tarjetaViaje, refsViajes, abrirRegistro, abrirViaje } from './viajes.js';
 import { avisoLicencia, turnoAbierto, turnoLargo } from './choferes.js';
 
 let contadoresAnimados = false;
@@ -156,10 +156,8 @@ export default {
     cuerpo.addEventListener('click', async (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.dataset.rapido) {
-        b.disabled = true;
-        if (await accionRapida(b.dataset.rapido, b.dataset.id)) await pintar(false);
-        b.disabled = false;
+      if (b.dataset.registrar) {
+        abrirRegistro(b.dataset.registrar, ultimos.viajes.find((v) => v.id === b.dataset.id), ultimos.refs, { alGuardar: () => pintar(false) });
       } else if (b.dataset.editar) {
         abrirViaje(ultimos.viajes.find((v) => v.id === b.dataset.editar), ultimos.refs, { alGuardar: () => pintar(false) });
       }

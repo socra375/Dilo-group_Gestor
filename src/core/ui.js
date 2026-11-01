@@ -111,6 +111,9 @@ export function toast(mensaje, tipo = 'ok', ms = 2800) {
   t.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
   t.innerHTML = `${icon(tipo === 'error' ? 'alert' : 'check')}<span>${esc(mensaje)}</span>`;
   zona.append(t);
+  // Como máximo 2 a la vez: si se apilan, tapan los botones de la pantalla.
+  const visibles = [...zona.children];
+  for (const viejo of visibles.slice(0, Math.max(0, visibles.length - 2))) viejo.remove();
   setTimeout(() => {
     if (reduceMotion()) return t.remove();
     t.classList.add('is-leaving');

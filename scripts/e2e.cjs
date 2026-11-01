@@ -52,43 +52,70 @@ async function espera(cond, ms = 4000) {
   ok((await page.inputValue('#f-llegadaProg')) === '00:15', 'llegada programada autocompletada 00:15');
   await page.fill('#f-salidaReal', '23:52');
   await page.fill('#f-llegadaReal', '00:40');
+  await page.dispatchEvent('#f-llegadaReal', 'change');
+  // Llega 25 min tarde (> tolerancia 5): el motivo aparece y es obligatorio.
+  ok(await page.locator('[data-campo="motivoRetraso"]').isVisible(), 'con retraso aparece el campo "Motivo del retraso"');
+  ok((await page.textContent('[data-campo="motivoRetraso"] .field__label')).includes('25 min tarde'), 'el motivo indica cuánto llegó tarde');
+  await page.click('dialog.sheet button[type=submit]');
+  ok((await page.textContent('#f-motivoRetraso-err')).includes('motivo'), 'sin motivo no deja guardar un viaje retrasado');
+  await page.click('[data-motivo-op="Tráfico"]');
   await page.click('dialog.sheet button[type=submit]');
   await page.waitForSelector('dialog.sheet', { state: 'detached' });
   const ultimo = (await leer(page, 'viajes')).filter((x) => !x.ejemplo).pop();
   ok(ultimo && ultimo.llegadaProg > ultimo.salidaProg, 'llegada programada guardada al día siguiente');
-  const tarjeta = page.locator('.item', { hasText: '11:50 p. m.' }).filter({ hasText: 'Retrasado' });
-  ok((await tarjeta.count()) === 1, 'viaje nocturno muestra "Retrasado (+25 min)"');
+  ok(ultimo.motivoRetraso === 'Tráfico', 'el chip de motivo rápido se guarda');
+  const tarjeta = page.locator('.item', { hasText: '11:50 p. m.' });
+  ok((await tarjeta.locator('.chip--error', { hasText: 'Retrasado' }).count()) === 1, 'viaje nocturno muestra "Retrasado" en rojo');
   ok((await tarjeta.first().textContent()).includes('+25 min'), 'retraso de 25 min calculado a través de la medianoche');
+  ok((await tarjeta.first().textContent()).includes('Salió 11:52 p. m. (+2 min)'), 'el retraso de salida se muestra como dato');
 
-  // Botón rápido "Salió ahora" → pasa a "En ruta" y aparece "Llegó ahora".
-  const antes = await page.locator('[data-rapido="salio"]').count();
-  if (antes) {
-    await page.locator('[data-rapido="salio"]').first().click();
-    ok(await espera(async () => (await page.locator('[data-rapido="salio"]').count()) === antes - 1), '"Salió ahora" registra la salida');
-    ok((await page.locator('.toast').last().textContent()).includes('Salida registrada'), 'toast de salida');
-  } else console.log('· sin viajes pendientes de salir hoy (depende de la hora)');
+  // Corregir la llegada a una hora a tiempo: el motivo desaparece y se limpia al guardar.
+  await tarjeta.locator('[data-editar]').click();
+  await page.fill('#f-llegadaReal', '00:18');
+  await page.dispatchEvent('#f-llegadaReal', 'change');
+  ok(await page.locator('[data-campo="motivoRetraso"]').isHidden(), 'sin retraso el campo del motivo no aparece');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  ok((await leer(page, 'viajes')).find((x) => x.id === ultimo.id).motivoRetraso === '', 'al quedar a tiempo, el motivo se limpia');
 
-  // Llegó ahora sobre un viaje "Sin llegada registrada" → pide motivo si va tarde.
-  const llego = page.locator('[data-rapido="llego"]').first();
-  if (await llego.count()) {
-    await llego.click();
-    // El toast dice si llegó tarde; solo entonces se abre la hoja del motivo.
-    await espera(async () => /retraso|A tiempo/.test(await page.locator('.toast').last().textContent().catch(() => '')));
-    const tarde = /retraso/.test(await page.locator('.toast').last().textContent());
-    const pide = tarde ? await espera(async () => (await page.locator('dialog.sheet', { hasText: 'Motivo del retraso' }).count()) === 1) : false;
-    if (pide) {
-      await page.fill('#f-motivoRetraso', 'Tapón en la 27');
-      await page.click('dialog.sheet button[type=submit]');
-      await page.waitForSelector('dialog.sheet', { state: 'detached' });
-      const guardado = await espera(async () => (await page.locator('.item', { hasText: 'Tapón en la 27' }).count()) === 1);
-      ok(guardado, 'motivo del retraso guardado');
-      if (!guardado) {
-        // Diagnóstico para el log de CI: qué había en pantalla y en el almacenamiento.
-        console.log('   tarjetas:', JSON.stringify(await page.locator('.item').allTextContents()));
-        console.log('   en almacenamiento:', (await leer(page, 'viajes')).filter((v) => v.motivoRetraso).map((v) => `${v.id}: ${v.motivoRetraso}`).join(' | '));
-      }
-    } else ok(true, 'llegada registrada a tiempo');
-  }
+  // Generar viajes desde los horarios fijos (mañana: día sin viajes, resultado independiente de la hora).
+  await page.click('[data-dia="1"]');
+  await page.waitForSelector('[data-lista] .empty');
+  ok((await page.textContent('[data-generar]')).includes('Generar viajes del'), 'el botón indica el día elegido');
+  await page.click('[data-generar]');
+  ok(await espera(async () => (await page.locator('[data-lista] .item').count()) === 7), 'genera un viaje por cada horario fijo (7)');
+  ok((await page.locator('[data-lista] .item', { hasText: 'Sin chofer' }).count()) === 7, 'los viajes generados quedan sin chofer ni vehículo');
+  await page.click('[data-generar]');
+  ok(await espera(async () => (await page.locator('.toast').last().textContent()).includes('Ya están creados')), 'generar dos veces no duplica');
+  ok((await page.locator('[data-lista] .item').count()) === 7, 'siguen siendo 7 viajes');
+
+  // Registrar salida a mano con el atajo "Ahora" (solo rellena; guarda al pulsar Guardar).
+  const primero = page.locator('[data-lista] .item', { hasText: 'R1 Alcarrizos' }).first();
+  await primero.locator('[data-registrar="salida"]').click();
+  await page.click('[data-ahora="salidaReal"]');
+  const horaPuesta = await page.inputValue('#f-salidaReal');
+  const horaEsperada = await page.evaluate(async () => (await import('/src/core/time.js')).horaAhora());
+  ok(horaPuesta === horaEsperada, `"Ahora" rellena la hora actual (${horaPuesta})`);
+  const idPrimero = (await leer(page, 'viajes')).filter((x) => !x.ejemplo && !x.choferId).sort((a, b) => a.salidaProg.localeCompare(b.salidaProg))[0].id;
+  ok((await leer(page, 'viajes')).find((x) => x.id === idPrimero).salidaReal === null, '"Ahora" no guarda nada por sí solo');
+  await page.fill('#f-salidaReal', '05:36'); // escrita a mano
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  ok(await espera(async () => (await primero.textContent()).includes('Salió 5:36 a. m. (+6 min)')), 'salida escrita a mano guardada');
+
+  // Registrar llegada tarde con motivo "Otro" escrito a mano.
+  await primero.locator('[data-registrar="llegada"]').click();
+  ok(await page.locator('[data-campo="motivoRetraso"]').isHidden(), 'antes de escribir la llegada no se pide motivo');
+  await page.fill('#f-llegadaReal', '06:50'); // programada 6:25 → +25
+  await page.dispatchEvent('#f-llegadaReal', 'change');
+  await page.click('[data-motivo-op="Otro"]');
+  ok((await page.inputValue('#f-motivoRetraso')) === '', '"Otro" deja el motivo en blanco para escribirlo');
+  await page.fill('#f-motivoRetraso', 'Goma pinchada en la autopista');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const registrado = (await leer(page, 'viajes')).find((x) => x.id === idPrimero);
+  ok(registrado.motivoRetraso === 'Goma pinchada en la autopista' && registrado.llegadaReal, 'llegada tarde guardada con su motivo');
+  await page.click('[data-dia="-1"]'); // volver a hoy
 
   // Turnos: marcar entrada y salida.
   await page.evaluate(() => { location.hash = '#/choferes'; });
@@ -233,6 +260,18 @@ async function espera(cond, ms = 4000) {
   ok(await espera(() => campoViejo.evaluate((el) => !el.isConnected)), 'Ajustes se repinta tras importar');
   await page.setInputFiles('#f-importar', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hola":1}') });
   ok(await espera(async () => (await page.textContent('#f-importar-err')).includes('no es un respaldo')), 'archivo ajeno rechazado con mensaje');
+
+  // Toasts: varios seguidos no se apilan ni tapan los botones (no capturan toques).
+  const toasts = await page.evaluate(async () => {
+    const { toast } = await import('/src/core/ui.js');
+    for (let i = 0; i < 6; i++) toast(`Aviso de prueba ${i}`);
+    const t = document.querySelector('.toast');
+    const r = t.getBoundingClientRect();
+    const debajo = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return { visibles: document.querySelectorAll('.toast').length, tocable: !debajo?.closest('.toast') };
+  });
+  ok(toasts.visibles <= 2, `como máximo 2 toasts a la vez (${toasts.visibles})`);
+  ok(toasts.tocable, 'los toasts no se tragan los toques');
 
   ok(!errores.length, `sin errores de consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
   // Migración: datos de la versión anterior (localStorage) pasan a IndexedDB una sola vez.

@@ -130,6 +130,15 @@ export function formatoDuracion(min) {
  * Un viaje cuenta como retrasado solo si el retraso SUPERA la tolerancia.
  */
 export function estadoViaje(viaje, ahora = new Date(), toleranciaMin = CONFIG.viajes.tolerancia_min) {
+  return { ...calcularEstado(viaje, ahora, toleranciaMin), retrasoSalidaMin: retrasoSalida(viaje) };
+}
+
+/** Retraso de SALIDA (dato informativo; el estado se decide por la llegada). null si no ha salido. */
+export function retrasoSalida(viaje) {
+  return viaje.salidaReal && viaje.salidaProg ? minutosEntre(viaje.salidaProg, viaje.salidaReal) : null;
+}
+
+function calcularEstado(viaje, ahora, toleranciaMin) {
   const t = new Date(ahora).getTime();
   if (viaje.llegadaReal) {
     const retrasoMin = minutosEntre(viaje.llegadaProg, viaje.llegadaReal);
@@ -161,3 +170,31 @@ export function estadoLicencia(venceClave, hoy, dias = Math.max(...CONFIG.avisos
   const d = diasEntre(hoy, venceClave);
   return { estado: d < 0 ? 'vencida' : d <= dias ? 'por_vencer' : 'vigente', dias: d };
 }
+
+/**
+ * Viajes a crear para `fecha` a partir de los horarios fijos de cada ruta.
+ * No duplica: si ya existe un viaje (no archivado) de esa ruta a esa hora, lo omite. Las rutas archivadas
+ * no generan viajes. Chofer y vehículo quedan sin asignar. La llegada = salida + duración normal.
+ */
+export function viajesDesdeHorarios(rutas, existentes, fecha, tz = ZONA) {
+  const ocupados = new Set(existentes.filter((v) => !v.archivado).map((v) => `${v.rutaId}|${v.salidaProg}`));
+  const nuevos = [];
+  for (const ruta of rutas) {
+    if (ruta.archivado || !Array.isArray(ruta.horarios)) continue;
+    for (const hora of [...new Set(ruta.horarios)].sort()) {
+      if (!/^\d{2}:\d{2}$/.test(hora)) continue;
+      const salidaProg = aISO(fecha, hora, tz);
+      if (ocupados.has(`${ruta.id}|${salidaProg}`)) continue;
+      ocupados.add(`${ruta.id}|${salidaProg}`);
+      nuevos.push({
+        rutaId: ruta.id, choferId: null, vehiculoId: null,
+        salidaProg, llegadaProg: sumarMinutos(salidaProg, Number(ruta.duracionMin) || 0),
+        salidaReal: null, llegadaReal: null, motivoRetraso: '', notas: '',
+      });
+    }
+  }
+  return nuevos.sort((a, b) => a.salidaProg.localeCompare(b.salidaProg));
+}
+
+/** Instante → 'HH:MM' de ahora en la zona del negocio (atajo "Ahora": solo rellena el campo). */
+export const horaAhora = (ahora = new Date(), tz = ZONA) => horaClave(ahora, tz);

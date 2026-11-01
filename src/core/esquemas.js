@@ -102,14 +102,16 @@ const ESQUEMAS = {
 
   viajes: [
     { clave: 'rutaId', etiqueta: 'Ruta', tipo: 'referencia', coleccion: 'rutas', mostrar: 'nombre', requerido: true, fijo: true },
-    { clave: 'choferId', etiqueta: 'Chofer', tipo: 'referencia', coleccion: 'choferes', mostrar: 'nombre', requerido: true },
-    { clave: 'vehiculoId', etiqueta: 'Vehículo', tipo: 'referencia', coleccion: 'vehiculos', mostrar: 'placa', requerido: true },
+    // No obligatorios: "Generar viajes de hoy" los crea sin asignar y el supervisor los completa después.
+    { clave: 'choferId', etiqueta: 'Chofer', tipo: 'referencia', coleccion: 'choferes', mostrar: 'nombre' },
+    { clave: 'vehiculoId', etiqueta: 'Vehículo', tipo: 'referencia', coleccion: 'vehiculos', mostrar: 'placa' },
     { clave: 'fecha', etiqueta: 'Fecha', tipo: 'fecha', requerido: true, fijo: true },
     { clave: 'salidaProg', etiqueta: 'Salida programada', tipo: 'hora', requerido: true, fijo: true, grupo: 'programado' },
     { clave: 'llegadaProg', etiqueta: 'Llegada programada', tipo: 'hora', requerido: true, fijo: true, grupo: 'programado', ayuda: 'Si es menor que la salida, se toma como el día siguiente.' },
-    { clave: 'salidaReal', etiqueta: 'Salida real', tipo: 'hora', fijo: true, grupo: 'real' },
-    { clave: 'llegadaReal', etiqueta: 'Llegada real', tipo: 'hora', fijo: true, grupo: 'real' },
-    { clave: 'motivoRetraso', etiqueta: 'Motivo del retraso', tipo: 'notas', max: 200 },
+    { clave: 'salidaReal', etiqueta: 'Salida real', tipo: 'hora', fijo: true, grupo: 'real', ahora: true },
+    { clave: 'llegadaReal', etiqueta: 'Llegada real', tipo: 'hora', fijo: true, grupo: 'real', ahora: true },
+    // Visible y obligatorio solo cuando el viaje queda Retrasado (CONFIG.viajes.motivo).
+    { clave: 'motivoRetraso', etiqueta: 'Motivo del retraso', tipo: 'motivo', opciones: MOTIVOS_RETRASO, max: 200 },
     { clave: 'notas', etiqueta: 'Notas', tipo: 'notas', max: 300 },
   ],
 

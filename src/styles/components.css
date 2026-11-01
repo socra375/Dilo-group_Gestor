@@ -602,7 +602,7 @@ dialog::backdrop { background: var(--scrim); }
   color: var(--c-bg);
   font-weight: 700;
   box-shadow: var(--shadow-2);
-  pointer-events: auto;
+  pointer-events: none; /* solo informa: nunca se traga un toque */
 }
 .toast--error { background: var(--c-error); color: #fff; }
 .toast .icon { flex: none; }
@@ -844,3 +844,10 @@ dialog::backdrop { background: var(--scrim); }
 }
 .field__warn:empty { display: none; }
 .field__warn::before { content: '!'; display: inline-grid; place-items: center; flex: none; width: 1.15em; height: 1.15em; margin-top: 0.1em; border-radius: 50%; background: var(--c-warn); color: var(--c-surface); font-size: 0.8em; }
+
+/* ---------- Hora con atajo "Ahora" y motivo con chips ---------- */
+.hora-ahora { display: flex; gap: var(--sp-2); }
+.hora-ahora .input { flex: 1; min-width: 0; }
+.motivo { display: grid; gap: var(--sp-2); }
+.motivo__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.motivo__chips .filter[aria-checked='true'] { background: var(--c-text); border-color: var(--c-text); color: var(--c-bg); }

@@ -135,3 +135,54 @@ test('estadoLicencia', async () => {
   assert.equal(estadoLicencia('2027-10-26', '2026-10-26', 30).estado, 'vigente');
   assert.equal(estadoLicencia('', '2026-10-26', 30).estado, null);
 });
+
+// ---- Retraso de salida y generación de viajes desde horarios ----
+import { retrasoSalida, viajesDesdeHorarios } from '../src/core/time.js';
+
+test('retraso de salida es un dato aparte: no cambia el estado', () => {
+  const v = {
+    salidaProg: aISO('2026-03-10', '08:00'), salidaReal: aISO('2026-03-10', '08:12'),
+    llegadaProg: aISO('2026-03-10', '09:00'), llegadaReal: aISO('2026-03-10', '09:03'),
+  };
+  assert.equal(retrasoSalida(v), 12);
+  const e = estadoViaje(v, new Date(), 5);
+  assert.equal(e.retrasoSalidaMin, 12);
+  assert.equal(e.puntualidad, 'a_tiempo'); // cuenta la llegada (+3), no la salida (+12)
+  assert.equal(retrasoSalida({ salidaProg: v.salidaProg }), null);
+});
+
+const RUTAS = [
+  { id: 'r1', duracionMin: 55, horarios: ['15:30', '05:30'] },
+  { id: 'r5', duracionMin: 25, horarios: ['23:40'] },
+  { id: 'r9', duracionMin: 30, horarios: ['07:00'], archivado: true },
+  { id: 'r0', duracionMin: 30 },
+];
+
+test('generar viajes: uno por horario, ordenados, sin chofer ni vehículo', () => {
+  const v = viajesDesdeHorarios(RUTAS, [], '2026-03-10');
+  assert.deepEqual(v.map((x) => [x.rutaId, horaClave(x.salidaProg)]), [['r1', '05:30'], ['r1', '15:30'], ['r5', '23:40']]);
+  assert.equal(v[0].choferId, null);
+  assert.equal(v[0].vehiculoId, null);
+  assert.equal(minutosEntre(v[0].salidaProg, v[0].llegadaProg), 55);
+});
+
+test('generar viajes: la llegada de un horario nocturno cae al día siguiente', () => {
+  const nocturno = viajesDesdeHorarios(RUTAS, [], '2026-03-10').find((x) => x.rutaId === 'r5');
+  assert.equal(fechaClave(nocturno.llegadaProg), '2026-03-11');
+  assert.equal(horaClave(nocturno.llegadaProg), '00:05');
+});
+
+test('generar viajes: no duplica los que ya existen (y sí recrea si el existente está archivado)', () => {
+  const existentes = [
+    { rutaId: 'r1', salidaProg: aISO('2026-03-10', '05:30') },
+    { rutaId: 'r5', salidaProg: aISO('2026-03-10', '23:40'), archivado: true },
+  ];
+  const v = viajesDesdeHorarios(RUTAS, existentes, '2026-03-10');
+  assert.deepEqual(v.map((x) => [x.rutaId, horaClave(x.salidaProg)]), [['r1', '15:30'], ['r5', '23:40']]);
+  // Generar dos veces seguidas no crea nada la segunda vez.
+  assert.equal(viajesDesdeHorarios(RUTAS, [...existentes, ...v], '2026-03-10').length, 0);
+});
+
+test('generar viajes: rutas archivadas o sin horarios no generan nada', () => {
+  assert.equal(viajesDesdeHorarios([RUTAS[2], RUTAS[3]], [], '2026-03-10').length, 0);
+});

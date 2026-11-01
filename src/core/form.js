@@ -3,6 +3,8 @@ import { esc, abrirHoja, toast, icon } from './ui.js';
 import { unidad, telefono, cedula, horaTexto } from './format.js';
 import { reducirImagen, pintarFotos, olvidarFoto, LADO_FOTO } from './fotos.js';
 import { guardarFoto, borrarFoto } from '../data/store.js';
+import { CONFIG } from '../config.js';
+import { horaAhora } from './time.js';
 
 const solo = (v, re) => String(v ?? '').replace(re, '');
 
@@ -54,8 +56,23 @@ function controlHTML(c, valor, refs) {
       return `<select class="select" ${comun}>${opcionesReferencia(c, refs, v)}</select>`;
     case 'fecha':
       return `<input class="input" type="date" ${comun} value="${esc(v)}">`;
-    case 'hora':
-      return `<input class="input" type="time" ${comun} value="${esc(v)}">`;
+    case 'hora': {
+      const entrada = `<input class="input" type="time" ${comun} value="${esc(v)}">`;
+      // Atajo "Ahora": solo rellena el campo con la hora actual; no guarda nada (CONFIG.viajes.atajo_ahora).
+      return c.ahora && CONFIG.viajes.atajo_ahora
+        ? `<div class="hora-ahora">${entrada}<button type="button" class="btn btn--ghost btn--sm" data-ahora="${c.clave}" aria-label="Poner la hora actual en ${esc(c.etiqueta)}">Ahora</button></div>`
+        : entrada;
+    }
+    case 'motivo': {
+      // Chips de motivos rápidos + texto libre. El valor guardado es el texto (un chip lo rellena).
+      const opciones = c.opciones || [];
+      return `<div class="motivo" data-motivo="${c.clave}">
+        <div class="motivo__chips" role="radiogroup" aria-label="Motivos frecuentes">${opciones
+          .map((o) => `<button type="button" class="filter" role="radio" aria-checked="${o === v}" data-motivo-op="${esc(o)}">${esc(o)}</button>`)
+          .join('')}</div>
+        <input class="input" type="text" autocomplete="off" maxlength="${c.max || 200}" placeholder="Elige un motivo o escríbelo" ${comun} value="${esc(v)}">
+      </div>`;
+    }
     case 'telefono':
       return `<input class="input" type="tel" inputmode="tel" autocomplete="off" placeholder="809-555-0000" ${comun} value="${esc(v)}">`;
     case 'cedula':
@@ -76,7 +93,8 @@ function controlHTML(c, valor, refs) {
 
 export function campoHTML(c, valor, refs = {}) {
   const id = `f-${c.clave}`;
-  const ancho = ['notas', 'texto', 'referencia', 'telefono', 'cedula', 'foto', 'horas'].includes(c.tipo) || !c.grupo ? 'field--full' : '';
+  // Las horas con atajo "Ahora" van en fila completa: en media columna el botón no cabe.
+  const ancho = ['notas', 'texto', 'referencia', 'telefono', 'cedula', 'foto', 'horas', 'motivo'].includes(c.tipo) || !c.grupo || (c.ahora && CONFIG.viajes.atajo_ahora) ? 'field--full' : '';
   return `<div class="field ${ancho}" data-campo="${c.clave}">
     <label class="field__label" for="${id}">${esc(c.etiqueta)}${c.requerido ? ' <span class="req" aria-hidden="true">*</span>' : ''}</label>
     ${controlHTML(c, valor, refs)}
@@ -312,6 +330,26 @@ export function abrirFormulario({ titulo, campos, valores = {}, refs = {}, grupo
   });
 
   form.addEventListener('click', (e) => {
+    const ahora = e.target.closest('[data-ahora]');
+    if (ahora) {
+      const entrada = form.elements[ahora.dataset.ahora];
+      entrada.value = horaAhora();
+      // Avisar como si el usuario la hubiera escrito (recalcula retraso y motivo); no se guarda nada.
+      entrada.dispatchEvent(new Event('input', { bubbles: true }));
+      entrada.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    const opcion = e.target.closest('[data-motivo-op]');
+    if (opcion) {
+      const cont = opcion.closest('[data-motivo]');
+      const entrada = cont.querySelector('input');
+      const otro = /^otro$/i.test(opcion.dataset.motivoOp);
+      entrada.value = otro ? '' : opcion.dataset.motivoOp;
+      cont.querySelectorAll('[data-motivo-op]').forEach((b) => b.setAttribute('aria-checked', String(b === opcion)));
+      entrada.dispatchEvent(new Event('input', { bubbles: true }));
+      if (otro) entrada.focus();
+      return;
+    }
     const quitarFoto = e.target.closest('[data-quitar-foto]');
     if (quitarFoto) {
       const cont = quitarFoto.closest('[data-foto-campo]');
