@@ -136,7 +136,10 @@ async function verificarTema(page, tema) {
   const servidor = crear().listen(0);
   const puerto = servidor.address().port;
   const navegador = await chromium.launch();
-  let fallos = 0;
+  // Esperado: en modo demostración src/config.local.js no existe (está en .gitignore) y el navegador registra su 404. Solo ese recurso.
+const esperado404 = (m) => /status of 404/.test(m.text()) && /config\.local\.js/.test(m.location().url);
+
+let fallos = 0;
 
   for (const tema of ['light', 'dark']) {
     const ctx = await navegador.newContext({
@@ -147,9 +150,9 @@ async function verificarTema(page, tema) {
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
     const errores = [];
-    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errores.push(`[${m.type()}] ${m.text()}`); });
+    page.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !esperado404(m)) errores.push(`[${m.type()}] ${m.text()}`); });
     page.on('pageerror', (e) => errores.push(`[pageerror] ${e.message}`));
-    page.on('requestfailed', (r) => { if (!r.url().includes('fonts.g')) errores.push(`[request] ${r.url()} ${r.failure()?.errorText}`); });
+    page.on('requestfailed', (r) => { if (!r.url().includes('fonts.g') && !r.url().includes('config.local.js')) errores.push(`[request] ${r.url()} ${r.failure()?.errorText}`); });
 
     await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
     await page.waitForLoadState('networkidle');
@@ -230,7 +233,7 @@ async function verificarTema(page, tema) {
     page.setDefaultTimeout(5000);
     const errores = [];
     page.on('pageerror', (e) => errores.push(e.message));
-    page.on('console', (m) => { if (m.type() === 'error') errores.push(m.text()); });
+    page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m)) errores.push(m.text()); });
     await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
     await page.waitForSelector('.stat');
     const nombreTema = tema === 'light' ? 'claro' : 'oscuro';
@@ -333,6 +336,39 @@ async function verificarTema(page, tema) {
     console.log(`${ok ? '✓' : '✗'} movimiento ${reducir ? 'reducido: sin animación' : 'normal: cambio de pantalla de 160–200 ms'} (${m.nombre}, ${(m.vista * 1000).toFixed(0)} ms)`);
     if (!ok) fallos++;
     await ctx.close();
+  }
+
+  // Pantalla de entrar (modo nube, fase 8): vacía y con el error de contraseña, en claro y oscuro, a 390 px y a 360 px con letra extra grande.
+  {
+    const falso = await require('./supabase-falso.cjs').crear({ usuarios: { 'ana@dilo.test': 'clave-ana' } });
+    const configLocal = `export const SUPABASE = { url: ${JSON.stringify(falso.url)}, anonKey: 'anon-publica-de-prueba', bucketFotos: 'fotos' };`;
+    for (const [tema, ancho, letra] of [['light', 390, null], ['dark', 390, null], ['light', 360, 'extra'], ['dark', 360, 'extra']]) {
+      const ctx = await navegador.newContext({ viewport: { width: ancho, height: 800 }, deviceScaleFactor: 2, colorScheme: tema, reducedMotion: 'reduce', locale: 'es-DO', serviceWorkers: 'block' });
+      await fijarTema(ctx, tema);
+      if (letra) await ctx.addInitScript((l) => { const p = JSON.parse(localStorage.getItem('ct:prefs') || '{}'); localStorage.setItem('ct:prefs', JSON.stringify({ ...p, letra: l })); }, letra);
+      await ctx.route('**/src/config.local.js', (r) => r.fulfill({ contentType: 'text/javascript', body: configLocal }));
+      const page = await ctx.newPage();
+      page.setDefaultTimeout(5000);
+      const errores = [];
+      page.on('pageerror', (e) => errores.push(e.message));
+      page.on('console', (m) => { if (m.type() === 'error' && !/status of 40[01]/.test(m.text())) errores.push(m.text()); });
+      await page.goto(`http://localhost:${puerto}/index.html`);
+      await page.waitForSelector('.login');
+      const etiqueta = `${tema} entrar ${ancho}px${letra ? '/letra extra' : ''}`;
+      for (const [vista, antes] of [['vacia', null], ['error', async () => { await page.fill('#f-email', 'ana@dilo.test'); await page.fill('#f-password', 'mala'); await page.click('.login button[type=submit]'); await page.waitForFunction(() => document.getElementById('login-err')?.textContent); }]]) {
+        if (antes) await antes();
+        await page.waitForTimeout(200);
+        const fuera = await desbordes(page);
+        const bajos = await contraste(page);
+        const a11y = await accesibilidad(page);
+        const problemas = [...fuera.map((x) => `desborde: ${x}`), ...bajos.map((x) => `contraste: ${x}`), ...a11y.map((v) => `${v.id} (${v.impacto}): ${v.ayuda} → ${v.ej}`)];
+        if (problemas.length) { fallos++; console.log(`✗ ${etiqueta} (${vista})\n   ${problemas.join('\n   ')}`); } else console.log(`✓ ${etiqueta} (${vista})`);
+        if (ancho === 390) await page.screenshot({ path: path.join(SALIDA, `${tema === 'light' ? 'claro' : 'oscuro'}-entrar-${vista}.png`) });
+      }
+      if (errores.length) { fallos++; console.log(`✗ ${etiqueta}: errores de consola\n   ${[...new Set(errores)].join('\n   ')}`); }
+      await ctx.close();
+    }
+    await falso.cerrar();
   }
 
   // PWA: el service worker precarga la app y abre sin conexión.

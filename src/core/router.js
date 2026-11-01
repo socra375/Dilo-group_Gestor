@@ -2,7 +2,7 @@
 // Cada módulo exporta por defecto { titulo, pestana, render(el, params) }; render puede devolver una función de limpieza.
 import { CONFIG } from '../config.js';
 import { EXTENSIONES } from './esquemas.js';
-import { reduceMotion } from './ui.js';
+import { reduceMotion, esc } from './ui.js';
 
 const RUTAS = {
   inicio: () => import('../modules/inicio.js'),
@@ -75,7 +75,19 @@ async function mostrar(animar = true) {
     else a.removeAttribute('aria-current');
   }
 
-  const r = await modulo.render(nueva, params);
+  let r;
+  try {
+    r = await modulo.render(nueva, params);
+  } catch (e) {
+    // Con Supabase una pantalla puede fallar por falta de red o por sesión vencida. Nunca queda en blanco ni con un error sin atrapar.
+    if (yo !== turno) return;
+    if (document.body.classList.contains('sin-sesion')) return; // la sesión venció: la pantalla de entrar ya está puesta y repintará al entrar
+    console.error(e);
+    nueva.innerHTML = `<div class="alert alert--error" role="alert"><span class="alert__body"><span class="alert__title">No se pudo cargar esta pantalla</span><span class="alert__text">${esc(e?.message || 'Error desconocido.')} Revisa la conexión e inténtalo de nuevo.</span></span></div>
+      <button type="button" class="btn btn--secondary" data-reintentar>Reintentar</button>`;
+    nueva.querySelector('[data-reintentar]').addEventListener('click', () => mostrar(false));
+    return;
+  }
   if (yo !== turno) return;
   if (typeof r === 'function') limpiar = r;
   if (animar && !reduceMotion()) nueva.classList.add('view--enter');

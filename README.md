@@ -5,8 +5,8 @@
 Web app móvil para **un supervisor** de transporte de personal en República Dominicana: viajes y retrasos, choferes y asistencia, rutas con horarios fijos, vehículos (seguro y mantenimiento), combustible con rendimiento y reportes para compartir por WhatsApp. Funciona sin internet una vez instalada.
 
 - HTML + CSS + JavaScript (módulos ES). **Sin framework y sin build**: los archivos se publican tal cual. La única dependencia son las fuentes de Google.
-- Datos en el teléfono (**IndexedDB**, con fotos) detrás de una capa (`src/data/store.js`) lista para cambiar a Supabase.
-- ⚠️ **Modo demostración**: no ingreses datos reales (cédulas, direcciones, fotos de empleados) hasta completar la fase 8 (autenticación + RLS). El código y los datos de ejemplo son visibles para quien abra el enlace.
+- Dos modos con la misma interfaz (`src/data/store.js`): **demostración** (datos de ejemplo en el teléfono, IndexedDB) y **nube** (Supabase: inicio de sesión, RLS y fotos en un bucket privado). Cuál corre lo decide un archivo: `src/config.local.js`.
+- ⚠️ **Sin `src/config.local.js` la app está en modo demostración: no ingreses datos reales** (cédulas, direcciones, fotos de empleados). Los datos reales solo se permiten con el modo nube **ya desplegado y verificado** (sección *Supabase*, abajo). El código de la página y los datos de ejemplo son visibles para quien abra el enlace.
 - Software propietario: ver [LICENSE.md](LICENSE.md). Decisiones y supuestos por confirmar: [DECISIONES.md](DECISIONES.md).
 
 ## Correr en local
@@ -23,9 +23,9 @@ npm run serve          # http://localhost:8080  (o: python3 -m http.server 8080)
 
 | Comando | Qué revisa |
 |---|---|
-| `npm test` | Unitarias (Node ≥ 20, sin dependencias): retrasos con medianoche, tolerancia y "sin llegada"; generación de viajes desde horarios; cada aviso (licencia, seguro, mantenimiento, combustible alto con y sin datos); rendimiento km/gal; reportes, CSV y textos de WhatsApp; lista del service worker. |
-| `npm run e2e` | Flujos reales en Chromium: validaciones, hora real a mano y motivo obligatorio, generar viajes, asistencia, fotos, compartir por WhatsApp (con y sin Web Share API), CSV, respaldo con fotos, migración de datos antiguos. |
-| `npm run qa` | Todas las pantallas a 390 px en claro y oscuro (y escritorio, y 360 px con letra extra grande): errores de consola, desbordes, **contraste AA**, **accesibilidad con axe-core**, movimiento reducido y apertura sin conexión. Guarda capturas en `qa/capturas/`. |
+| `npm test` | Unitarias (Node ≥ 20, sin dependencias): retrasos con medianoche, tolerancia y "sin llegada"; generación de viajes desde horarios; cada aviso (licencia, seguro, mantenimiento, combustible alto con y sin datos); rendimiento km/gal; reportes, CSV y textos de WhatsApp; lista del service worker; **cliente de Supabase** contra un servidor falso (sesión, renovación de token, aislamiento entre usuarios, claves foráneas, fotos privadas con URL firmada, paginación) y coherencia entre el SQL y el cliente; barrera contra claves `service_role`. |
+| `npm run e2e` | Flujos reales en Chromium: validaciones, hora real a mano y motivo obligatorio, generar viajes, asistencia, fotos, compartir por WhatsApp (con y sin Web Share API), CSV, respaldo con fotos, migración de datos antiguos; y, aparte (`scripts/e2e-nube.cjs`), el **modo nube** completo contra el servidor falso. |
+| `npm run qa` | Todas las pantallas a 390 px en claro y oscuro (y escritorio, y 360 px con letra extra grande): errores de consola, desbordes, **contraste AA**, **accesibilidad con axe-core**, movimiento reducido y apertura sin conexión; pantalla de **Entrar**. Guarda capturas en `qa/capturas/`. |
 
 `e2e` y `qa` usan Playwright; la revisión de accesibilidad usa axe-core (solo para pruebas):
 
@@ -43,7 +43,7 @@ Las tres corren en **GitHub Actions** en cada push (`.github/workflows/ci.yml`);
 
 Todas las rutas son relativas y la navegación usa `#/pantalla`: no hay que configurar nada más. Pages sirve por HTTPS, requisito del service worker y de instalar la app.
 
-**En cada publicación**, sube `VERSION` en `sw.js` (`'v9'` → `'v10'`): los teléfonos reciben la versión nueva la siguiente vez que abren la app. Si agregas un archivo `.js`/`.css`/imagen, añádelo a `ARCHIVOS` en `sw.js`: `npm test` falla si se te olvida.
+**En cada publicación**, sube `VERSION` en `sw.js` (`'v10'` → `'v11'`): los teléfonos reciben la versión nueva la siguiente vez que abren la app. Si agregas un archivo `.js`/`.css`/imagen, añádelo a `ARCHIVOS` en `sw.js`: `npm test` falla si se te olvida.
 
 ### Instalar en el teléfono
 
@@ -77,11 +77,14 @@ Los módulos futuros (sueldos, mantenimiento completo, servicios del vehículo, 
 
 ```
 index.html, manifest.webmanifest, sw.js, LICENSE.md, README.md, DECISIONES.md
-config.example.js         plantilla de src/config.local.js (fase 8; ese archivo no se sube)
+config.example.js         plantilla de src/config.local.js (activa el modo nube; ese archivo no se sube)
+supabase/001_tablas_y_seguridad.sql   tablas, RLS y bucket privado (se ejecuta una vez en Supabase)
 icons/                    íconos de la PWA (SVG fuente + PNG; `node scripts/iconos.cjs`)
 src/app.js                arranque: apariencia, migración de datos, datos de ejemplo, router, service worker
 src/config.js             CONFIG del cliente: qué está activo
-src/data/store.js         capa de datos: list, get, create, update, archive, remove (+ fotos)
+src/data/store.js         capa de datos: list, get, create, update, archive, remove (+ fotos); IndexedDB o Supabase
+src/data/supabase.js      cliente mínimo de Supabase (Auth, PostgREST, Storage) con fetch, sin librerías
+src/core/entrar.js        pantalla de inicio de sesión (solo modo nube)
 src/data/seed.js          datos de ejemplo
 src/core/esquemas.js      campos de cada módulo (tipo, etiqueta, validación) y parámetros
 src/core/router.js        rutas por hash        src/core/ui.js      hoja inferior, confirmación, toasts
@@ -94,9 +97,207 @@ src/core/grafica.js       gráfica de barras en SVG      src/core/fotos.js   red
 src/modules/              una pantalla por archivo (+ extensiones/ reservadas)
 src/styles/               tokens, base, componentes, animaciones
 tests/                    pruebas unitarias (node --test)
-scripts/                  servidor local, QA, e2e, generador de íconos
+scripts/                  servidor local, QA, e2e (+ modo nube), Supabase falso, generador de íconos, generador de config.local.js para publicar
+.github/workflows/        ci.yml (pruebas en cada push) y pages.yml (publicación manual con Supabase)
 ```
 
-## Migrar el store a Supabase (fase 8)
+## Supabase: inicio de sesión, RLS y fotos privadas (fase 8)
 
-**Pendiente.** Se hace tocando **solo `src/data/store.js`** (los módulos llaman a `list / get / create / update / archive / remove` y a las funciones de fotos, todas asíncronas) y agregando el inicio de sesión. Cuando esté lista, esta sección traerá el SQL de las tablas, las políticas RLS en **todas** las tablas, el bucket **privado** de fotos con URLs firmadas y los pasos de configuración. Hasta entonces **no ingreses datos reales**.
+> ⚠️ **Estado honesto.** Todo lo de esta sección está implementado y probado **contra un servidor falso** (`scripts/supabase-falso.cjs`) que imita Auth, PostgREST y Storage y lee las tablas de este mismo SQL. Eso demuestra que el cliente habla bien con una API que se comporta como Supabase y que el cliente y el SQL coinciden. **No demuestra que el SQL corra en un proyecto real ni que las políticas RLS reales aíslen a los usuarios.** Eso solo se sabe aplicándolo en un proyecto y haciendo la **prueba de aislamiento** del paso 6. Hasta entonces, **no ingreses datos reales**.
+
+### Cómo se protege
+- **Auth**: el supervisor entra con correo y contraseña. No hay registro público: el administrador crea la cuenta en el panel.
+- **RLS activado y forzado en TODAS las tablas** (`vehiculos, rutas, choferes, viajes, combustible, asistencia`). Cada fila lleva `owner = auth.uid()`; la única política es "solo el dueño" para el rol `authenticated`. El rol `anon` —la clave que va en la página— no puede leer ni escribir nada.
+- **Fotos** en un bucket **privado** (`fotos`, máx. 2 MB, solo JPEG/PNG/WebP), una carpeta por usuario (`<uid>/<foto>`). Se leen con **URLs firmadas de 5 minutos**; nunca hay enlace público.
+- **Ningún secreto en el repositorio.** En la página solo va la clave pública (*anon* / *publishable*), en `src/config.local.js` (ignorado por git). **Nunca la `service_role`**: se salta RLS. Asume que cualquiera que abra la página ve todo su código y esa clave; lo que protege los datos es RLS, no esconder la clave.
+
+### Pasos
+1. **Proyecto**: crea uno en [supabase.com](https://supabase.com) (o usa uno propio). Región cercana (p. ej. Norteamérica Este).
+2. **SQL**: *SQL Editor → New query*, pega el bloque de abajo y ejecútalo **una vez**. Está en `supabase/001_tablas_y_seguridad.sql`.
+3. **Cerrar el registro**: *Authentication → Sign In / Providers → Email*: desactiva **"Allow new users to sign up"** (si no, cualquiera con la clave pública se puede crear una cuenta). Considera también exigir contraseña larga.
+4. **Crear el usuario**: *Authentication → Users → Add user* con el correo y la contraseña del supervisor.
+5. **Conectar la página**: copia `config.example.js` como `src/config.local.js` y pon la **URL del proyecto** y la **clave anon/publishable** (*Project Settings → API*). Para probar en tu computadora: `npm run serve`.
+6. **Prueba de aislamiento (obligatoria antes de datos reales)**: crea un **segundo** usuario de prueba (paso 4) y, desde un navegador aparte, comprueba que no ve nada del primero y que desde la consola `fetch('<url>/rest/v1/choferes?select=*', { headers: { apikey, Authorization: 'Bearer ' + <token del segundo> } })` devuelve `[]`. Luego borra el usuario de prueba. En *Advisors → Security* no debe aparecer ninguna alerta de tabla sin RLS.
+7. **Respaldo**: *Ajustes → Exportar respaldo* funciona en modo nube (incluye fotos). *Importar* **reemplaza todos los datos de tu cuenta** por los del respaldo; si la base rechaza algo a mitad de carga, se restauran los datos anteriores. Los datos de ejemplo de la demostración **no** se migran y un respaldo de la demostración se rechaza.
+
+### Publicar con Supabase en GitHub Pages
+`src/config.local.js` está en `.gitignore`, así que con *Deploy from a branch* **nunca llega a la página** y quedaría en modo demostración. Para publicar en modo nube:
+1. *Settings → Secrets and variables → Actions → **Variables***: crea `SUPABASE_URL` y `SUPABASE_ANON_KEY` (la clave pública no necesita ser secreto).
+2. *Settings → Pages → Source*: **GitHub Actions**.
+3. *Actions → Publicar en Pages → Run workflow*. El flujo corre las pruebas, arma el sitio sin archivos de desarrollo y genera `config.local.js` **rechazando cualquier clave que no sea anon/publishable** (`scripts/generar-config-local.cjs`).
+
+Para volver a la demostración, borra las dos variables y vuelve a ejecutar el flujo.
+
+### Límites conocidos
+- Los datos viven en la nube; **sin internet la app abre, pero no carga datos** (la demostración sí funciona sin conexión). Trabajo sin conexión con sincronización queda fuera de esta fase.
+- Un solo supervisor por cuenta: `owner = auth.uid()` aísla cuentas, no hay roles ni compartir datos entre usuarios. Para varios supervisores sobre los mismos datos hay que cambiar el modelo de políticas.
+- Si se borra (no archiva) un chofer, sus viajes y cargas se conservan con el chofer en blanco (`on delete set null`); su asistencia sí se borra (`cascade`). La app solo archiva; el borrado ocurre al importar un respaldo.
+- La sesión se guarda en `localStorage` (como casi toda app sin servidor propio). La app no carga scripts de terceros y escapa el texto de usuario, pero **no se ha hecho una auditoría formal contra XSS** y un script inyectado podría leer la sesión: mantén las dependencias en cero y revísalo antes de usar datos reales.
+
+### SQL completo (`supabase/001_tablas_y_seguridad.sql`)
+
+```sql
+-- Dilo group · Control de Transporte — tablas, seguridad (RLS) y almacenamiento de fotos.
+-- Se ejecuta UNA vez en el SQL Editor de Supabase (o con `supabase db push`). Es idempotente donde se puede.
+--
+-- Modelo de seguridad:
+--   * Cada fila lleva `owner` = el usuario que la creó (auth.uid()).
+--   * RLS está ACTIVADO en todas las tablas y solo existen políticas para el rol `authenticated`
+--     y solo sobre filas propias. El rol `anon` (la clave pública que va en la página) no puede leer ni escribir nada.
+--   * Las fotos van en un bucket PRIVADO; cada usuario solo ve su carpeta (<uid>/<foto>) y se leen con URLs firmadas.
+--   * IMPORTANTE (en el panel, no en SQL): Authentication → Sign In / Providers → desactiva "Allow new users to sign up",
+--     y crea tú el usuario del supervisor en Authentication → Users → Add user.
+
+-- ---------- Utilidades ----------
+create or replace function public.fijar_actualizado() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  new.actualizado := now();
+  return new;
+end $$;
+
+-- ---------- Tablas (orden por dependencias) ----------
+create table if not exists public.vehiculos (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  placa text not null,
+  descripcion text,
+  estado text not null default 'disponible' check (estado in ('disponible', 'taller', 'fuera')),
+  seguro_aseguradora text,
+  seguro_poliza text,
+  seguro_vence date,
+  mantenimiento_fecha date,
+  mantenimiento_km integer,
+  notas text,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now(),
+  unique (owner, placa)
+);
+
+create table if not exists public.rutas (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  nombre text not null,
+  origen text,
+  destino text,
+  duracion_min integer not null check (duracion_min between 1 and 1440),
+  horarios text[] not null default '{}',
+  cliente text,
+  km numeric,
+  paradas text,
+  tarifa numeric,
+  notas text,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+
+create table if not exists public.choferes (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  nombre text not null,
+  cedula text,
+  telefono text,
+  direccion text,
+  licencia text,
+  licencia_vence date,
+  contacto_nombre text,
+  contacto_telefono text,
+  vehiculo_id uuid references public.vehiculos(id) on delete set null,
+  fecha_ingreso date,
+  notas text,
+  foto_id uuid,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+
+create table if not exists public.viajes (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  ruta_id uuid references public.rutas(id) on delete set null,
+  chofer_id uuid references public.choferes(id) on delete set null,
+  vehiculo_id uuid references public.vehiculos(id) on delete set null,
+  salida_prog timestamptz not null,
+  llegada_prog timestamptz not null,
+  salida_real timestamptz,
+  llegada_real timestamptz,
+  motivo_retraso text,
+  notas text,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+create index if not exists viajes_owner_salida on public.viajes (owner, salida_prog);
+
+create table if not exists public.combustible (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  fecha date not null,
+  hora text check (hora is null or hora ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  vehiculo_id uuid references public.vehiculos(id) on delete set null,
+  chofer_id uuid references public.choferes(id) on delete set null,
+  cantidad numeric not null check (cantidad > 0),
+  monto numeric not null check (monto > 0),
+  tipo text,
+  km integer,
+  estacion text,
+  tanque_lleno boolean not null default true,
+  foto_id uuid,
+  notas text,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+create index if not exists combustible_owner_fecha on public.combustible (owner, fecha);
+
+create table if not exists public.asistencia (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  chofer_id uuid references public.choferes(id) on delete cascade,
+  fecha date not null,
+  entrada timestamptz not null,
+  salida timestamptz,
+  archivado boolean not null default false,
+  creado timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+create index if not exists asistencia_owner_fecha on public.asistencia (owner, fecha);
+
+-- ---------- Triggers de `actualizado` ----------
+do $$
+declare t text;
+begin
+  foreach t in array array['vehiculos', 'rutas', 'choferes', 'viajes', 'combustible', 'asistencia'] loop
+    execute format('drop trigger if exists fijar_actualizado on public.%I', t);
+    execute format('create trigger fijar_actualizado before update on public.%I for each row execute function public.fijar_actualizado()', t);
+  end loop;
+end $$;
+
+-- ---------- Seguridad: RLS en TODAS las tablas ----------
+do $$
+declare t text;
+begin
+  foreach t in array array['vehiculos', 'rutas', 'choferes', 'viajes', 'combustible', 'asistencia'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('alter table public.%I force row level security', t);
+    execute format('revoke all on public.%I from anon', t);
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+    execute format('drop policy if exists "solo el dueño" on public.%I', t);
+    -- (select auth.uid()) se evalúa una vez por consulta, no por fila.
+    execute format($p$create policy "solo el dueño" on public.%I for all to authenticated
+                      using (owner = (select auth.uid())) with check (owner = (select auth.uid()))$p$, t);
+  end loop;
+end $$;
+
+-- ---------- Fotos: bucket PRIVADO, una carpeta por usuario ----------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('fotos', 'fotos', false, 2097152, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 2097152, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "fotos: solo el dueño" on storage.objects;
+create policy "fotos: solo el dueño" on storage.objects for all to authenticated
+  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text)
+  with check (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text);
+```

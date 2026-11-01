@@ -924,3 +924,11 @@ dialog::backdrop { background: var(--scrim); }
 /* Resumen de 3 tarjetas en 2 columnas: la última (impar) ocupa todo el ancho en vez de dejar un hueco. */
 .stats--resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .stats--resumen > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* ---------- Inicio de sesión (Supabase) ---------- */
+.login { display: grid; gap: var(--sp-4); max-width: 420px; margin: var(--sp-6) auto 0; }
+/* Sin sesión no se muestra nada de la app: ni menú, ni botones, ni avisos de datos de ejemplo. */
+body.sin-sesion .tabbar, body.sin-sesion #tema-rapido, body.sin-sesion #badge-ejemplo, body.sin-sesion .fab { display: none !important; }
+body.sin-sesion { padding-left: 0 !important; }
+/* Con datos reales en la nube desaparece el aviso de modo demostración. */
+body.modo-nube .demo-note, body.modo-nube #badge-ejemplo { display: none !important; }

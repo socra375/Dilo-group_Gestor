@@ -1,7 +1,10 @@
 // Capa de datos. Interfaz única y ASÍNCRONA:
 //   list(col, { archivados })  get(col, id)  create(col, datos)  update(col, id, cambios)  archive(col, id)  remove(col, id)
-// Implementación actual: IndexedDB (admite fotos). Para migrar a Supabase se reescribe SOLO este archivo (ver README).
-// Ningún otro archivo toca IndexedDB.
+// Dos implementaciones detrás de la misma interfaz:
+//   * IndexedDB (por defecto, modo demostración: los datos viven solo en este teléfono).
+//   * Supabase (si existe src/config.local.js): Auth + tablas con RLS + fotos en un bucket privado (src/data/supabase.js).
+// Los módulos de la app no saben cuál está activa. Ningún otro archivo toca IndexedDB ni Supabase.
+import { crearCliente, ORDEN_TABLAS, esUuid } from './supabase.js';
 
 export const COLECCIONES = ['choferes', 'rutas', 'vehiculos', 'viajes', 'combustible', 'asistencia'];
 const FOTOS = 'fotos';
@@ -9,6 +12,7 @@ const BD = 'dilo-transporte';
 const VERSION_BD = 2; // 2: la colección 'turnos' pasa a llamarse 'asistencia'
 
 let conexion = null;
+let nube = null; // cliente de Supabase cuando está configurado
 
 function abrir() {
   if (!conexion) {
@@ -82,12 +86,14 @@ function nuevoId() {
 /** @param {{ archivados?: boolean | 'todos' }} [opciones] false = solo activos (por defecto), true = solo archivados */
 export async function list(col, { archivados = false } = {}) {
   verificar(col);
+  if (nube) return nube.datos.list(col, { archivados });
   const items = await transaccion([col], 'readonly', (a) => esperar(a[col].getAll()));
   return archivados === 'todos' ? items : items.filter((i) => Boolean(i.archivado) === Boolean(archivados));
 }
 
 export async function get(col, id) {
   verificar(col);
+  if (nube) return nube.datos.get(col, id);
   return (await transaccion([col], 'readonly', (a) => esperar(a[col].get(id)))) ?? null;
 }
 
@@ -95,6 +101,11 @@ export async function create(col, datos) {
   verificar(col);
   const ahora = new Date().toISOString();
   const item = { archivado: false, ...datos, id: datos.id ?? nuevoId(), creado: ahora, actualizado: ahora };
+  if (nube) {
+    const creado = await nube.datos.create(col, item);
+    avisarCambio(col);
+    return creado;
+  }
   await transaccion([col], 'readwrite', (a) => esperar(a[col].add(item)));
   avisarCambio(col);
   return item;
@@ -102,6 +113,11 @@ export async function create(col, datos) {
 
 export async function update(col, id, cambios) {
   verificar(col);
+  if (nube) {
+    const actualizado = await nube.datos.update(col, id, cambios);
+    avisarCambio(col);
+    return actualizado;
+  }
   const item = await transaccion([col], 'readwrite', async (a) => {
     const actual = await esperar(a[col].get(id));
     if (!actual) throw new Error('El registro ya no existe.');
@@ -121,6 +137,11 @@ export function archive(col, id, archivado = true) {
 /** Borrado definitivo. Devuelve true si existía. */
 export async function remove(col, id) {
   verificar(col);
+  if (nube) {
+    const existia = await nube.datos.remove(col, id);
+    if (existia) avisarCambio(col);
+    return existia;
+  }
   const existia = await transaccion([col], 'readwrite', async (a) => {
     const actual = await esperar(a[col].get(id));
     if (actual) a[col].delete(id);
@@ -134,6 +155,12 @@ export async function remove(col, id) {
 
 export async function createMany(col, lista) {
   verificar(col);
+  if (nube) {
+    const ahora = new Date().toISOString();
+    const n = await nube.datos.createMany(col, lista.map((d) => ({ archivado: false, ...d, id: d.id ?? nuevoId(), creado: d.creado ?? ahora, actualizado: ahora })));
+    avisarCambio(col);
+    return n;
+  }
   const ahora = new Date().toISOString();
   await transaccion([col], 'readwrite', (a) => {
     for (const d of lista) a[col].put({ archivado: false, ...d, id: d.id ?? nuevoId(), creado: d.creado ?? ahora, actualizado: ahora });
@@ -144,6 +171,11 @@ export async function createMany(col, lista) {
 
 export async function removeMany(col, ids) {
   verificar(col);
+  if (nube) {
+    const n = await nube.datos.removeMany(col, ids);
+    if (n) avisarCambio(col);
+    return n;
+  }
   const n = await transaccion([col], 'readwrite', async (a) => {
     const existentes = new Set(await esperar(a[col].getAllKeys()));
     let borrados = 0;
@@ -161,6 +193,7 @@ export async function removeMany(col, ids) {
 
 /** Copia completa de todas las colecciones (sin fotos; ver listarFotos). */
 export async function exportAll() {
+  if (nube) return Object.fromEntries(await Promise.all(COLECCIONES.map(async (c) => [c, await nube.datos.list(c, { archivados: 'todos' })])));
   return transaccion(COLECCIONES, 'readonly', async (a) => {
     const pares = await Promise.all(COLECCIONES.map(async (c) => [c, await esperar(a[c].getAll())]));
     return Object.fromEntries(pares);
@@ -172,6 +205,7 @@ export async function replaceAll(datos, fotos = null) {
   for (const c of COLECCIONES) {
     if (!Array.isArray(datos[c])) throw new Error(`El respaldo no tiene la lista "${c}".`);
   }
+  if (nube) return reemplazarEnNube(datos, fotos);
   const nombres = fotos ? [...COLECCIONES, FOTOS] : COLECCIONES;
   await transaccion(nombres, 'readwrite', (a) => {
     for (const c of COLECCIONES) {
@@ -190,22 +224,26 @@ export async function replaceAll(datos, fotos = null) {
 
 /** Guarda una imagen (Blob) y devuelve su id. */
 export async function guardarFoto(blob, id = nuevoId()) {
+  if (nube) return nube.fotos.guardar(blob, id);
   await transaccion([FOTOS], 'readwrite', (a) => esperar(a[FOTOS].put({ id, blob, tipo: blob.type, creado: new Date().toISOString() })));
   return id;
 }
 
 export async function leerFoto(id) {
   if (!id) return null;
+  if (nube) return nube.fotos.leer(id);
   const f = await transaccion([FOTOS], 'readonly', (a) => esperar(a[FOTOS].get(id)));
   return f?.blob ?? null;
 }
 
 export async function borrarFoto(id) {
   if (!id) return;
+  if (nube) return nube.fotos.borrar(id);
   await transaccion([FOTOS], 'readwrite', (a) => esperar(a[FOTOS].delete(id)));
 }
 
 export async function listarFotos() {
+  if (nube) return nube.fotos.listar();
   return transaccion([FOTOS], 'readonly', (a) => esperar(a[FOTOS].getAll()));
 }
 
@@ -216,7 +254,7 @@ export async function listarFotos() {
  * IndexedDB está vacío, se copian una sola vez y se borran las claves viejas.
  */
 export async function migrarDesdeLocalStorage() {
-  if (typeof localStorage === 'undefined') return 0;
+  if (nube || typeof localStorage === 'undefined') return 0;
   const LEGADO = { turnos: 'asistencia' }; // nombre viejo → nombre actual
   const claves = [...COLECCIONES.map((c) => [c, c]), ...Object.entries(LEGADO).map(([viejo, nuevo]) => [viejo, nuevo])];
   const viejas = claves.map(([clave, col]) => [col, localStorage.getItem(`ct:v1:${clave}`), clave]).filter(([, v]) => v);
@@ -246,3 +284,73 @@ export async function pedirPersistencia() {
     return false;
   }
 }
+
+// ---------- Supabase ----------
+
+/**
+ * Restaurar un respaldo en Supabase: valida primero (ids y referencias deben ser UUID: un respaldo de la
+ * versión de demostración trae ids como "ej-chofer-1" y no se puede subir), luego vacía y vuelve a cargar
+ * en orden de dependencias. Las fotos se suben a la carpeta del usuario (las que ya había no se borran).
+ *
+ * Vaciar y cargar no es una transacción (son varias peticiones). Para no dejar al supervisor sin datos si la base
+ * rechaza algo a mitad de camino, antes de vaciar se guarda una copia en memoria y, si la carga falla, se restaura.
+ */
+async function reemplazarEnNube(datos, fotos) {
+  const REFERENCIAS = ['rutaId', 'choferId', 'vehiculoId'];
+  for (const col of ORDEN_TABLAS) {
+    for (const x of datos[col]) {
+      if (!esUuid(x.id) || [...REFERENCIAS, 'fotoId'].some((k) => x[k] && !esUuid(x[k]))) {
+        throw new Error('Este respaldo es de la versión de demostración (sus identificadores no son válidos en la nube). No se importó nada.');
+      }
+    }
+  }
+  const vaciar = async () => {
+    for (const col of [...ORDEN_TABLAS].reverse()) {
+      const ids = (await nube.datos.list(col, { archivados: 'todos' })).map((x) => x.id);
+      await nube.datos.removeMany(col, ids);
+    }
+  };
+  const cargar = async (origen) => {
+    // Una referencia a un registro que no está en el respaldo se deja vacía en vez de hacer fallar toda la carga.
+    const presentes = new Set(Object.values(origen).flat().map((x) => x.id));
+    for (const col of ORDEN_TABLAS) {
+      const limpios = origen[col].map((x) => {
+        const y = { ...x };
+        for (const k of REFERENCIAS) if (y[k] && !presentes.has(y[k])) y[k] = null;
+        return y;
+      });
+      await nube.datos.createMany(col, limpios);
+    }
+  };
+
+  const copia = await exportAll();
+  try {
+    await vaciar();
+    await cargar(datos);
+  } catch (e) {
+    try {
+      await vaciar();
+      await cargar(copia);
+    } catch (e2) {
+      for (const c of COLECCIONES) avisarCambio(c);
+      throw new Error(`No se pudo importar (${e.message}) y tampoco se pudieron restaurar tus datos anteriores (${e2.message}). Importa tu último respaldo.`);
+    }
+    for (const c of COLECCIONES) avisarCambio(c);
+    throw new Error(`No se pudo importar: ${e.message}. Tus datos anteriores se conservaron.`);
+  }
+  for (const f of fotos ?? []) await nube.fotos.guardar(f.blob, f.id);
+  for (const c of COLECCIONES) avisarCambio(c);
+}
+
+/** Activa Supabase como almacén de datos. Los módulos siguen usando la misma interfaz. */
+export function usarSupabase(config, opciones = {}) {
+  // Si no se puede renovar la sesión, la app lo sabe (evento) y pide entrar de nuevo.
+  nube = crearCliente(config, { alVencer: () => window.dispatchEvent(new CustomEvent('sesion-vencida')), ...opciones });
+  return nube;
+}
+
+export const nubeActiva = () => Boolean(nube);
+export const entrar = (email, password) => nube.entrar(email, password);
+export const salir = () => nube.salir();
+export const sesionActual = () => nube?.sesion() ?? null;
+export const restaurarSesion = () => (nube ? nube.restaurar() : Promise.resolve(false));

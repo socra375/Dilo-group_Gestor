@@ -8,6 +8,6 @@
     "test": "node --test tests/*.test.js",
     "serve": "node scripts/serve.cjs",
     "qa": "node scripts/qa.cjs",
-    "e2e": "node scripts/e2e.cjs"
+    "e2e": "node scripts/e2e.cjs && node scripts/e2e-nube.cjs"
   }
 }

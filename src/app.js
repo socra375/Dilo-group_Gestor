@@ -2,9 +2,10 @@
 import { CONFIG } from './config.js';
 import { pref, setPref, letraPx } from './core/prefs.js';
 import { icon } from './core/ui.js';
-import { iniciarRouter, ir } from './core/router.js';
+import { iniciarRouter, ir, refrescar } from './core/router.js';
 import { sembrarSiPrimeraVez, hayDatosEjemplo } from './data/seed.js';
-import { pedirPersistencia, migrarDesdeLocalStorage } from './data/store.js';
+import { pedirPersistencia, migrarDesdeLocalStorage, usarSupabase, restaurarSesion } from './data/store.js';
+import { pedirInicioSesion } from './core/entrar.js';
 
 const raiz = document.documentElement;
 
@@ -29,6 +30,15 @@ async function actualizarInsignia() {
   document.getElementById('badge-ejemplo').hidden = !(await hayDatosEjemplo());
 }
 
+/** src/config.local.js (ignorado por git) activa Supabase. Sin ese archivo, la app corre en modo demostración. */
+async function cargarNube() {
+  try {
+    return (await import('./config.local.js')).SUPABASE ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function iniciar() {
   document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
   document.getElementById('brand-name').textContent = CONFIG.empresa.nombre;
@@ -50,11 +60,24 @@ async function iniciar() {
     document.getElementById('main').focus();
   });
 
-  try {
-    await migrarDesdeLocalStorage();
-    await sembrarSiPrimeraVez();
-  } catch (e) {
-    console.error('No se pudieron preparar los datos', e);
+  const nube = await cargarNube();
+  if (nube) {
+    // Datos reales: nada de demostración. Hace falta una sesión antes de mostrar o pedir cualquier dato.
+    usarSupabase(nube);
+    document.body.classList.add('modo-nube');
+    if (!(await restaurarSesion())) await pedirInicioSesion();
+    // Si la sesión no se puede renovar a mitad de uso, se pide entrar de nuevo y se repinta la pantalla.
+    window.addEventListener('sesion-vencida', async () => {
+      await pedirInicioSesion();
+      refrescar();
+    });
+  } else {
+    try {
+      await migrarDesdeLocalStorage();
+      await sembrarSiPrimeraVez();
+    } catch (e) {
+      console.error('No se pudieron preparar los datos', e);
+    }
   }
   await actualizarInsignia();
   let pendiente = null;

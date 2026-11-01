@@ -105,6 +105,7 @@ export default {
     const ultimo = pref('ultimoRespaldo');
     const persistente = await navigator.storage?.persisted?.().catch(() => false);
     const avisos = avisosConfig();
+    const sesion = store.sesionActual();
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
     el.innerHTML = `
@@ -155,6 +156,12 @@ export default {
         <h2 class="section__title" id="t-ejemplo">Datos de ejemplo</h2>
         <p class="muted">La app trae choferes, rutas, vehículos, viajes y cargas de ejemplo para que veas cómo funciona. Bórralos antes de empezar a usarla en serio.</p>
         <button type="button" class="btn btn--danger btn--block" data-borrar-ejemplo>${icon('trash')}Borrar todos los datos de ejemplo</button>
+      </section>` : ''}
+
+      ${store.nubeActiva() ? `<section class="card section" aria-labelledby="t-cuenta">
+        <h2 class="section__title" id="t-cuenta">Cuenta</h2>
+        <dl class="kv"><dt>Sesión</dt><dd>${esc(sesion?.email || '—')}</dd><dt>Datos</dt><dd>En la nube (protegidos por cuenta)</dd></dl>
+        <button type="button" class="btn btn--secondary btn--block" data-cerrar-sesion>${icon('logout')}Cerrar sesión</button>
       </section>` : ''}
 
       <section class="card section" aria-labelledby="t-disp">
@@ -222,7 +229,10 @@ export default {
     el.addEventListener('click', async (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.hasAttribute('data-restablecer-avisos')) {
+      if (b.hasAttribute('data-cerrar-sesion')) {
+        await store.salir();
+        location.reload(); // vuelve a la pantalla de entrar, sin datos en pantalla
+      } else if (b.hasAttribute('data-restablecer-avisos')) {
         setPref('avisos', {});
         toast('Avisos restablecidos a los valores de la configuración.');
         refrescar();

@@ -2,6 +2,9 @@
 const { chromium } = require('playwright');
 const { crear } = require('./serve.cjs');
 
+// Esperado: en modo demostración src/config.local.js no existe (está en .gitignore) y el navegador registra su 404. Solo ese recurso.
+const esperado404 = (m) => /status of 404/.test(m.text()) && /config\.local\.js/.test(m.location().url);
+
 let fallos = 0;
 const ok = (cond, msg) => {
   console.log(`${cond ? '✓' : '✗'} ${msg}`);
@@ -38,7 +41,7 @@ async function espera(cond, ms = 4000) {
   page.setDefaultTimeout(5000);
   const errores = [];
   page.on('pageerror', (e) => errores.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errores.push(m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m)) errores.push(m.text()); });
   page.on('dialog', (d) => { errores.push(`alert() usado: ${d.message()}`); d.dismiss(); });
 
   await page.goto(`${base}#/viajes`);

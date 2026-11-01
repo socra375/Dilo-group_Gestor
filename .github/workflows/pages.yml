@@ -1,0 +1,58 @@
+# Publicación en GitHub Pages desde Actions (necesaria para el modo nube: src/config.local.js está en .gitignore y con
+# "Deploy from a branch" nunca llegaría a la página). Es MANUAL: no cambia nada hasta que la ejecutes desde la pestaña
+# Actions y hayas puesto Settings → Pages → Source = "GitHub Actions". Ver README, "Publicar con Supabase".
+#
+# Variables del repositorio (Settings → Secrets and variables → Actions → Variables; no hace falta que sean secretos,
+# la clave anon es pública por diseño): SUPABASE_URL y SUPABASE_ANON_KEY. Sin ellas se publica en modo demostración.
+name: Publicar en Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pruebas unitarias (incluye la comprobación de que no hay claves secretas en el código)
+        run: npm test
+
+      - name: Armar el sitio (solo lo que usa la página)
+        run: |
+          mkdir _site
+          cp -r index.html manifest.webmanifest sw.js icons src _site/
+          cp LICENSE.md _site/
+          rm -f _site/src/config.local.js
+
+      - name: Activar Supabase si hay variables (rechaza cualquier clave que no sea la pública)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: node scripts/generar-config-local.cjs _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: despliegue
+        uses: actions/deploy-pages@v4
