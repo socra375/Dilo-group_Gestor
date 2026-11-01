@@ -1,5 +1,6 @@
 // Cálculos de reportes (puros, sin DOM) y generación de CSV.
 import { estadoViaje, fechaClave, inicioSemana, sumarDias } from './time.js';
+import { rendimientos } from './avisos.js';
 
 /**
  * Retrasos agrupados por `campo` ('choferId' | 'rutaId') para viajes con salida en [desde, hasta].
@@ -94,4 +95,33 @@ export function retrasosPorDia(viajes, { hoy, dias = 7, tolerancia, ahora = new 
     }
   }
   return lista;
+}
+
+/**
+ * Combustible por vehículo en [desde, hasta]: cargas, galones, monto, precio promedio por galón y rendimiento
+ * promedio (km/gal) de las cargas del periodo que tienen rendimiento. El rendimiento se calcula con TODAS las
+ * cargas (la primera del periodo puede apoyarse en una anterior). Ordenado por monto, de mayor a menor.
+ */
+export function combustiblePorVehiculo(cargas, { desde, hasta }) {
+  const rend = rendimientos(cargas);
+  const grupos = new Map();
+  for (const c of cargas) {
+    if (c.archivado || c.fecha < desde || c.fecha > hasta) continue;
+    const g = grupos.get(c.vehiculoId) ?? { id: c.vehiculoId, cargas: 0, galones: 0, monto: 0, _rend: [] };
+    g.cargas++;
+    g.galones += Number(c.cantidad) || 0;
+    g.monto += Number(c.monto) || 0;
+    const r = rend.get(c.id);
+    if (r?.kmGal != null) g._rend.push(r.kmGal);
+    grupos.set(c.vehiculoId, g);
+  }
+  return [...grupos.values()]
+    .map(({ _rend, ...g }) => ({
+      ...g,
+      galones: Math.round(g.galones * 10) / 10,
+      monto: Math.round(g.monto * 100) / 100,
+      precioGalon: g.galones ? Math.round((g.monto / g.galones) * 100) / 100 : null,
+      kmGal: _rend.length ? Math.round((_rend.reduce((a, b) => a + b, 0) / _rend.length) * 10) / 10 : null,
+    }))
+    .sort((a, b) => b.monto - a.monto);
 }

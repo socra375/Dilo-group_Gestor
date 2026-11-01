@@ -920,3 +920,7 @@ dialog::backdrop { background: var(--scrim); }
 .graf__tabla summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--c-primary); font-weight: 700; font-size: var(--fs-sm); }
 .graf__fila-hoy th, .graf__fila-hoy td { font-weight: 700; }
 .graf__tabla th[scope='row'] { text-align: left; font-weight: 400; }
+
+/* Resumen de 3 tarjetas en 2 columnas: la última (impar) ocupa todo el ancho en vez de dejar un hueco. */
+.stats--resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stats--resumen > :last-child:nth-child(odd) { grid-column: 1 / -1; }

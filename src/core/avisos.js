@@ -1,6 +1,7 @@
 // Cálculo de avisos (funciones puras, sin DOM; probadas en tests/avisos.test.js).
 // Severidad: 'urgente' (vencido o muy próximo) | 'atencion'.
 import { CONFIG } from '../config.js';
+import { avisosConfig } from './prefs.js';
 import { diasEntre, estadoViaje, fechaClave, sumarDias, formatoDuracion } from './time.js';
 
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
@@ -21,13 +22,13 @@ export function vencimiento(venceClave, hoy, dias) {
   return { severidad, dias: faltan, umbral, texto, vencido: faltan < 0 };
 }
 
-export function avisoLicencia(chofer, hoy, op = CONFIG.avisos.licencia) {
+export function avisoLicencia(chofer, hoy, op = avisosConfig().licencia) {
   if (!op?.activo || chofer.archivado) return null;
   const v = vencimiento(chofer.licenciaVence, hoy, op.dias);
   return v && { tipo: 'licencia', ...v, texto: `Licencia ${v.texto}` };
 }
 
-export function avisoSeguro(vehiculo, hoy, op = CONFIG.avisos.seguro) {
+export function avisoSeguro(vehiculo, hoy, op = avisosConfig().seguro) {
   if (!op?.activo || vehiculo.archivado) return null;
   const v = vencimiento(vehiculo.seguroVence, hoy, op.dias);
   return v && { tipo: 'seguro', ...v, texto: `Seguro ${v.texto}` };
@@ -37,7 +38,7 @@ export function avisoSeguro(vehiculo, hoy, op = CONFIG.avisos.seguro) {
  * Mantenimiento pendiente: la fecha está a `op.dias` o menos, o faltan `op.km` o menos según el último
  * kilometraje registrado (de las cargas de combustible). Si ya pasó la fecha o el km → urgente.
  */
-export function avisoMantenimiento(vehiculo, hoy, ultimoKm, op = CONFIG.avisos.mantenimiento) {
+export function avisoMantenimiento(vehiculo, hoy, ultimoKm, op = avisosConfig().mantenimiento) {
   if (!op?.activo || vehiculo.archivado) return null;
   const motivos = [];
   let urgente = false;
@@ -126,7 +127,7 @@ const MIN_CARGAS_PROMEDIO = 2; // SUPUESTO: con menos de 2 rendimientos previos 
  * peor (menos km/gal) que su promedio de los últimos `ventana_dias` (sin contar esa carga) por más de `umbral_pct`.
  * Sin suficientes datos no avisa.
  */
-export function avisoCombustibleAlto(vehiculo, cargas, op = CONFIG.avisos.combustible_alto, rend = rendimientos(cargas)) {
+export function avisoCombustibleAlto(vehiculo, cargas, op = avisosConfig().combustible_alto, rend = rendimientos(cargas)) {
   if (!op?.activo || vehiculo.archivado) return null;
   const propias = cargas
     .filter((c) => !c.archivado && c.vehiculoId === vehiculo.id && rend.get(c.id)?.kmGal != null)
@@ -163,7 +164,7 @@ const horaTxt = (iso, tz = CONFIG.empresa.zona) => new Intl.DateTimeFormat('es-D
  * Viajes: los de hoy que llegaron tarde (atención) y los de hoy o ayer cuya llegada programada + tolerancia ya
  * pasó sin llegada registrada (urgente: el supervisor debe averiguar qué pasó).
  */
-export function calcularAvisos(datos, { hoy, ahora = new Date(), tolerancia = CONFIG.viajes.tolerancia_min, op = CONFIG.avisos } = {}) {
+export function calcularAvisos(datos, { hoy, ahora = new Date(), tolerancia = CONFIG.viajes.tolerancia_min, op = avisosConfig() } = {}) {
   const { viajes = [], choferes = [], vehiculos = [], combustible = [], rutas = [] } = datos;
   const nombreRuta = new Map(rutas.map((r) => [r.id, r.nombre]));
   const lista = [];

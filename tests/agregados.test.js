@@ -83,3 +83,21 @@ test('retrasosPorDia: sin viajes devuelve 7 días en cero', () => {
   assert.deepEqual(r.map((d) => d.retrasos), [0, 0, 0, 0, 0, 0, 0]);
   assert.equal(r[0].fecha, '2026-10-26');
 });
+
+import { combustiblePorVehiculo } from '../src/core/agregados.js';
+
+test('combustiblePorVehiculo: totales, precio por galón y rendimiento promedio; ordena por monto', () => {
+  const c = (id, vehiculoId, fecha, km, cantidad, monto, extra = {}) => ({ id, vehiculoId, fecha, hora: '07:00', km, cantidad, monto, tanqueLleno: true, ...extra });
+  const cargas = [
+    c('a1', 'v1', '2026-09-28', 10000, 20, 4000), // fuera del periodo: solo sirve de base
+    c('a2', 'v1', '2026-10-02', 10480, 20, 4000), // 24 km/gal
+    c('a3', 'v1', '2026-10-05', 10880, 20, 4400), // 20 km/gal
+    c('b1', 'v2', '2026-10-03', 500, 10, 2000),
+    c('x', 'v1', '2026-10-04', 99999, 99, 99999, { archivado: true }),
+  ];
+  const r = combustiblePorVehiculo(cargas, { desde: '2026-10-01', hasta: '2026-10-31' });
+  assert.deepEqual(r.map((x) => x.id), ['v1', 'v2']);
+  assert.deepEqual([r[0].cargas, r[0].galones, r[0].monto, r[0].precioGalon, r[0].kmGal], [2, 40, 8400, 210, 22]);
+  assert.deepEqual([r[1].cargas, r[1].kmGal], [1, null]); // una sola carga: aún sin rendimiento
+  assert.deepEqual(combustiblePorVehiculo([], { desde: '2026-10-01', hasta: '2026-10-31' }), []);
+});

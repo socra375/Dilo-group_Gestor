@@ -54,3 +54,19 @@ export function setPref(clave, valor) {
 
 export const tolerancia = () => Number(pref('toleranciaMin')) || 0;
 export const letraPx = () => TAMANOS_LETRA[pref('letra')] ?? TAMANOS_LETRA.normal;
+
+/**
+ * Umbrales de avisos: los de CONFIG.avisos con lo que el supervisor cambió en Ajustes por encima.
+ * Solo se pueden cambiar los umbrales (días, %, km); encender o apagar un aviso se hace en CONFIG.
+ */
+export function avisosConfig() {
+  const base = CONFIG.avisos;
+  const o = pref('avisos') || {};
+  return {
+    ...base,
+    licencia: { ...base.licencia, dias: o.licenciaDias ?? base.licencia.dias },
+    seguro: { ...base.seguro, dias: o.seguroDias ?? base.seguro.dias },
+    combustible_alto: { ...base.combustible_alto, umbral_pct: o.combustiblePct ?? base.combustible_alto.umbral_pct, ventana_dias: o.combustibleVentana ?? base.combustible_alto.ventana_dias },
+    mantenimiento: { ...base.mantenimiento, dias: o.mantenimientoDias ?? base.mantenimiento.dias, km: o.mantenimientoKm ?? base.mantenimiento.km },
+  };
+}

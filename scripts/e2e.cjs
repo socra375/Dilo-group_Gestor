@@ -332,12 +332,52 @@ async function espera(cond, ms = 4000) {
   ok((await page.locator('[data-lista] .item').count()) === esperado.viajes, 'la lista muestra los viajes de hoy con su estado');
   ok((await page.locator('[data-lista] .item .chip').count()) >= esperado.viajes, 'cada viaje lleva su chip de estado');
 
-  // Reportes: CSV descargable.
+  // ---- Fase 6: reportes, compartir por WhatsApp y CSV ----
+  // Se instrumenta la página para capturar lo que se comparte (sin abrir nada de verdad).
   await ir(page, 'reportes');
-  await page.waitForSelector('[data-csv="chofer"]');
-  const [csv] = await Promise.all([page.waitForEvent('download'), page.click('[data-csv="chofer"]')]);
-  const contenido = require('fs').readFileSync(await csv.path(), 'utf8');
-  ok(contenido.startsWith('﻿Chofer,Viajes,Completados'), `CSV de retrasos por chofer (${csv.suggestedFilename()})`);
+  await page.waitForSelector('[data-whatsapp="resumen"]');
+  const titulosReportes = await page.locator('main .section__title').allTextContents();
+  ok(['Resumen del día', 'Retrasos por chofer', 'Retrasos por ruta', 'Combustible por semana o mes', 'Combustible por vehículo'].every((t) => titulosReportes.includes(t)), 'están los 5 reportes: ' + titulosReportes.join(' · '));
+  ok((await page.locator('[data-whatsapp]').count()) === 5, 'cada reporte tiene "Compartir por WhatsApp"');
+  ok((await page.locator('[data-csv]').count()) === 4, 'y CSV como extra (4: el resumen diario solo se comparte)');
+
+  // Con Web Share API: se comparte el texto limpio.
+  await page.evaluate(() => { window.__compartido = []; navigator.share = (d) => { window.__compartido.push(d.text); return Promise.resolve(); }; });
+  await page.click('[data-whatsapp="resumen"]');
+  await espera(async () => (await page.evaluate(() => window.__compartido.length)) === 1);
+  const texto = await page.evaluate(() => window.__compartido[0]);
+  ok(texto.startsWith('*Dilo group · Resumen del día*') && /\*Viajes:\* \d+/.test(texto) && texto.includes('*Combustible:*') && texto.includes('*Avisos:*'), 'el resumen diario se comparte con la Web Share API');
+  ok(texto.split('\n').every((l) => l.length <= 112) && !/[|\t]/.test(texto), 'el texto son líneas cortas, sin tablas');
+  const ayer = await page.evaluate(async () => (await import('/src/core/time.js')).sumarDias((await import('/src/core/time.js')).hoyClave(), -1));
+  await page.fill('[data-dia]', ayer);
+  await page.dispatchEvent('[data-dia]', 'change');
+  await page.waitForSelector('[data-whatsapp="resumen"]');
+  await page.click('[data-whatsapp="resumen"]');
+  await espera(async () => (await page.evaluate(() => window.__compartido.length)) === 2);
+  ok(!(await page.evaluate(() => window.__compartido[1])).includes('*Avisos:*'), 'un día pasado no lleva avisos (son del presente)');
+
+  // Cancelar la hoja de compartir no es un error ni abre otra cosa.
+  await page.evaluate(() => { window.__abiertas = []; window.open = (u) => { window.__abiertas.push(u); return null; }; navigator.share = () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })); });
+  await page.click('[data-whatsapp="retrasos-chofer"]');
+  await page.waitForTimeout(150);
+  ok((await page.evaluate(() => window.__abiertas.length)) === 0, 'cancelar la hoja de compartir no abre WhatsApp');
+
+  // Sin Web Share API: abre https://wa.me/?text=… con el texto codificado.
+  await page.evaluate(() => { navigator.share = undefined; });
+  await page.click('[data-whatsapp="retrasos-chofer"]');
+  await espera(async () => (await page.evaluate(() => window.__abiertas.length)) === 1);
+  const url = await page.evaluate(() => window.__abiertas[0]);
+  ok(url.startsWith('https://wa.me/?text=') && decodeURIComponent(url.slice(20)).startsWith('*Dilo group · Retrasos por chofer*'), 'sin Web Share API se abre wa.me con el texto codificado');
+
+  // Combustible por vehículo: tabla con rendimiento y CSV.
+  const filaVeh = page.locator('#t-combustible-vehiculo').locator('xpath=ancestor::section').locator('tbody tr', { hasText: 'I045821' });
+  await page.click('[data-periodo="30d"]');
+  ok(await espera(async () => /\d+\.\d/.test(await filaVeh.locator('td').last().textContent())), 'combustible por vehículo muestra el rendimiento km/gal');
+  for (const [id, cabecera] of [['retrasos-chofer', 'Chofer,Viajes'], ['retrasos-ruta', 'Ruta,Viajes'], ['combustible-periodo', 'Semana (lunes),Cargas'], ['combustible-vehiculo', 'Vehículo,Cargas']]) {
+    const [descarga] = await Promise.all([page.waitForEvent('download'), page.click(`[data-csv="${id}"]`)]);
+    const csvTexto = require('fs').readFileSync(await descarga.path(), 'utf8');
+    ok(csvTexto.startsWith(`﻿${cabecera}`), `CSV ${id} (${descarga.suggestedFilename()})`);
+  }
 
   // Ajustes: tolerancia inválida muestra error junto al campo.
   await ir(page, 'ajustes');
@@ -355,9 +395,31 @@ async function espera(cond, ms = 4000) {
   await page.click('[data-letra="extra"]');
   ok((await page.evaluate(() => document.documentElement.style.fontSize)) === '21px', 'tamaño de letra aplicado');
 
+  // Umbrales de avisos editables: validan junto al campo y se aplican al instante.
+  await page.fill('#f-aviso-licenciaDias', '0');
+  await page.dispatchEvent('#f-aviso-licenciaDias', 'change');
+  ok((await page.textContent('#f-aviso-licenciaDias-err')).includes('1 a 5 números'), 'umbral de licencia inválido se rechaza junto al campo');
+  await page.fill('#f-aviso-licenciaDias', '7, 3');
+  await page.dispatchEvent('#f-aviso-licenciaDias', 'change');
+  ok((await page.inputValue('#f-aviso-licenciaDias')) === '7, 3', 'el umbral válido se ordena y se guarda (7, 3)');
+  await ir(page, 'inicio');
+  await page.waitForSelector('.graf svg');
+  await page.click('[data-ver-avisos]');
+  ok(!(await page.textContent('dialog.sheet[open]')).includes('Licencia vence en 10 días'), 'con umbral de 7 días, la licencia que vence en 10 ya no avisa');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  await ir(page, 'ajustes');
+  await page.click('[data-restablecer-avisos]');
+  await page.waitForSelector('#f-aviso-licenciaDias');
+  ok(await espera(async () => (await page.inputValue('#f-aviso-licenciaDias')) === '30, 15, 7'), 'restablecer vuelve a los valores de la configuración');
+
   // Respaldo: exportar → borrar ejemplo → importar restaura.
+  const fotosAntes = await page.evaluate(async () => (await (await import('/src/data/store.js')).listarFotos()).length);
   const [resp] = await Promise.all([page.waitForEvent('download'), page.click('[data-exportar]')]);
   const rutaResp = await resp.path();
+  const respaldoJson = JSON.parse(require('fs').readFileSync(rutaResp, 'utf8'));
+  ok(respaldoJson.formato === 2 && respaldoJson.fotos.length === fotosAntes && fotosAntes >= 1, `el respaldo incluye las fotos (${respaldoJson.fotos.length})`);
+  ok(respaldoJson.fotos.every((f) => /^data:image\/jpeg;base64,/.test(f.datos)), 'las fotos van en base64 (JPEG)');
   const totalAntes = (await leer(page, 'viajes')).length;
   await page.click('[data-borrar-ejemplo]');
   await page.click('dialog.modal [data-r="1"]');
@@ -372,6 +434,14 @@ async function espera(cond, ms = 4000) {
   await page.setInputFiles('#f-importar', rutaResp);
   await page.click('dialog.modal [data-r="1"]');
   ok(await espera(async () => (await leer(page, 'viajes')).length === totalAntes), 'importar respaldo restaura todos los viajes');
+  ok(await espera(async () => (await page.evaluate(async () => (await (await import('/src/data/store.js')).listarFotos()).length)) === fotosAntes), 'importar el respaldo restaura también las fotos');
+  const restauradaOk = await page.evaluate(async () => {
+    const st = await import('/src/data/store.js');
+    const carga = (await st.list('combustible')).find((c) => c.fotoId);
+    const blob = carga ? await st.leerFoto(carga.fotoId) : null;
+    return Boolean(blob && blob.type === 'image/jpeg' && blob.size > 100);
+  });
+  ok(restauradaOk, 'la foto restaurada sigue ligada a su carga y es un JPEG válido');
   // Importar repinta Ajustes: esperar a que el campo anterior se desmonte antes de seguir.
   ok(await espera(() => campoViejo.evaluate((el) => !el.isConnected)), 'Ajustes se repinta tras importar');
   await page.setInputFiles('#f-importar', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hola":1}') });
