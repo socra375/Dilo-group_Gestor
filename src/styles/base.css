@@ -65,6 +65,9 @@ textarea {
   border-radius: var(--r-sm);
 }
 
+/* `hidden` debe ganar siempre, aunque una clase fije `display` (p. ej. .btn). */
+[hidden] { display: none !important; }
+
 .sr-only {
   position: absolute;
   width: 1px;

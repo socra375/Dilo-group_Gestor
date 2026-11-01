@@ -53,8 +53,10 @@ export const META = {
 
 const ESQUEMAS = {
   choferes: [
+    { clave: 'fotoId', cfg: 'foto', etiqueta: 'Foto', tipo: 'foto', lado: 400 },
     { clave: 'nombre', cfg: 'nombre', etiqueta: 'Nombre completo', tipo: 'texto', requerido: true, fijo: true, enLista: 'titulo', buscable: true, max: 80 },
-    { clave: 'cedula', cfg: 'cedula', etiqueta: 'Cédula', tipo: 'cedula', buscable: true },
+    // La spec pide validar la cédula sin bloquear: si no tiene 11 dígitos, solo se advierte.
+    { clave: 'cedula', cfg: 'cedula', etiqueta: 'Cédula', tipo: 'cedula', buscable: true, soloAdvertir: true },
     { clave: 'telefono', cfg: 'telefono', etiqueta: 'Teléfono', tipo: 'telefono', enLista: 'subtitulo', buscable: true },
     { clave: 'direccion', cfg: 'direccion', etiqueta: 'Dirección', tipo: 'texto', max: 120 },
     { clave: 'licencia', cfg: 'licencia_vencimiento', etiqueta: 'Licencia (número o categoría)', tipo: 'texto', grupo: 'licencia', buscable: true, max: 30 },
@@ -71,6 +73,7 @@ const ESQUEMAS = {
     { clave: 'origen', cfg: 'salida', etiqueta: 'Punto de salida', tipo: 'texto', requerido: true, enLista: 'subtitulo', buscable: true, max: 60 },
     { clave: 'destino', cfg: 'llegada', etiqueta: 'Punto de llegada', tipo: 'texto', requerido: true, enLista: 'subtitulo', buscable: true, max: 60 },
     { clave: 'duracionMin', cfg: 'duracion_min', etiqueta: 'Duración normal (minutos)', tipo: 'numero', requerido: true, fijo: true, enLista: 'meta', min: 1, max: 1440, entero: true },
+    { clave: 'horarios', cfg: 'horarios_fijos', etiqueta: 'Horarios fijos de salida', tipo: 'horas', ayuda: 'Con estos horarios se generan los viajes del día.' },
     { clave: 'cliente', cfg: 'cliente', etiqueta: 'Empresa o cliente que la usa', tipo: 'texto', enLista: 'meta', buscable: true, max: 60 },
     // Desactivados por decisión del cliente; quedan definidos para encenderlos con una línea en CONFIG.
     { clave: 'km', cfg: 'km', etiqueta: 'Distancia (km)', tipo: 'numero', min: 0, max: 2000 },
@@ -80,7 +83,7 @@ const ESQUEMAS = {
 
   vehiculos: [
     // Placa RD: 1–2 letras + 5–6 dígitos (p. ej. I045821).
-    { clave: 'placa', cfg: 'placa', etiqueta: 'Placa', tipo: 'placa', requerido: true, fijo: true, enLista: 'titulo', buscable: true, patron: '^[A-Z]{1,2}\\d{5,6}$', mensajePatron: 'Usa 1–2 letras y 5–6 números, sin espacios (ej. I045821).' },
+    { clave: 'placa', cfg: 'placa', etiqueta: 'Placa', tipo: 'placa', requerido: true, fijo: true, enLista: 'titulo', buscable: true, patron: '^[A-Z]{1,2}\\d{5,6}$', mensajePatron: 'El formato usual es 1–2 letras y 5–6 números (ej. I045821). Se guardará como la escribiste.', soloAdvertir: true },
     { clave: 'descripcion', cfg: 'descripcion', etiqueta: 'Descripción (marca, modelo, capacidad)', tipo: 'texto', enLista: 'subtitulo', buscable: true, max: 80 },
     {
       clave: 'estado', cfg: 'estado', etiqueta: 'Estado', tipo: 'seleccion', requerido: true, enLista: 'chip', porDefecto: 'disponible',

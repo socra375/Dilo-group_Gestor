@@ -4,6 +4,7 @@ import { camposDe, META, GRUPOS } from './esquemas.js';
 import { abrirFormulario } from './form.js';
 import { esc, icon, vacio, confirmar, toast, conCarga, escalonar } from './ui.js';
 import * as fmt from './format.js';
+import { pintarFotos } from './fotos.js';
 
 export const normalizar = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -50,9 +51,16 @@ function describirPorDefecto(campos) {
   };
 }
 
+/** Foto redonda (se carga después con pintarFotos) o iniciales si no hay foto. */
+export function avatarHTML(fotoId, nombre, clase = '') {
+  const iniciales = String(nombre || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  return `<span class="avatar ${clase}" aria-hidden="true">${fotoId ? `<img alt="" data-foto="${esc(fotoId)}">` : esc(iniciales)}</span>`;
+}
+
 export function itemHTML(item, d, accionesHTML = '') {
   return `<li class="item ${item.archivado ? 'item--archived' : ''} ${d.clase || ''}">
-    <button type="button" class="item__main" data-editar="${esc(item.id)}" aria-label="Editar ${esc(d.titulo)}">
+    <button type="button" class="item__main" data-editar="${esc(item.id)}" aria-label="${d.etiquetaAccion || 'Editar'} ${esc(d.titulo)}">
+      ${d.avatar !== undefined ? avatarHTML(d.avatar, d.titulo) : ''}
       <span class="item__body">
         <span class="item__title">${esc(d.titulo)}</span>
         ${d.subtitulo ? `<span class="item__subtitle">${esc(d.subtitulo)}</span>` : ''}
@@ -123,6 +131,7 @@ export function pantallaCrud(op) {
         }
         lista.innerHTML = visibles.map((it) => itemHTML(it, describir(it, refs), it.archivado ? '' : op.accionesItem?.(it, refs) || '')).join('');
         if (animar) escalonar(lista);
+        pintarFotos(lista);
       };
 
       const cargar = async (animar) => {
@@ -208,7 +217,11 @@ export function pantallaCrud(op) {
           return;
         }
         const ed = e.target.closest('[data-editar]');
-        if (ed) abrir(items.find((x) => x.id === ed.dataset.editar));
+        if (!ed) return;
+        const item = items.find((x) => x.id === ed.dataset.editar);
+        // Algunos módulos muestran primero una ficha (p. ej. chofer con Llamar y WhatsApp) que lleva a editar.
+        if (op.alAbrir && !item.archivado) op.alAbrir(item, { refs, editar: () => abrir(item), recargar: cargar });
+        else abrir(item);
       });
 
       await cargar(true);

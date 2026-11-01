@@ -32,7 +32,7 @@ Cada uno se cambia sin tocar la lógica, en el lugar indicado.
 | Módulo de asistencia del chofer (lo mencionó en la llamada, no en el cuestionario) | activo | `CONFIG.modulos.asistencia` |
 | "Choferes activos" = choferes no archivados (el cuestionario no pide un campo "estado" para choferes) | — | `esquemas.js` si se quiere un estado |
 | Rendimiento km/galón: solo entre cargas de **tanque lleno** (si una carga no llenó el tanque, el cálculo da números falsos y dispararía el aviso de combustible alto) | casilla "Tanque lleno", marcada por defecto | fase 4 |
-| Formato de placa RD (1–2 letras + 5–6 dígitos) | patrón de validación | `esquemas.js` → `vehiculos.placa.patron` |
+| Formato de placa RD (1–2 letras + 5–6 dígitos): igual que la cédula, **solo advierte** y guarda lo escrito (hay placas especiales) | advertencia | `esquemas.js` → `vehiculos.placa` (`soloAdvertir`) |
 | Respaldo recomendado cada 7 días; turno abierto largo a las 12 h | 7 días / 12 h | `PARAMETROS` en `esquemas.js` |
 | Precios de combustible en los datos de ejemplo | Gasoil RD$235.10, Gasolina RD$272.50 por galón | `src/data/seed.js` |
 | `renta_vehiculos` y `facturacion` quedan en `CONFIG.modulos` (venían en la config pegada) pero **sin** carpeta de extensión, porque no los pidió | `false` | — |
@@ -55,6 +55,10 @@ Cada uno se cambia sin tocar la lógica, en el lugar indicado.
 | T12 | Escritorio: con mouse y ≥ 768 px, la barra inferior pasa a un riel lateral de íconos que se despliega al pasar el mouse. En el celular se mantiene la barra inferior. | Pedido del dueño del repositorio; en pantallas táctiles no existe el hover. |
 | T13 | Mientras no exista la fase 8, la app muestra "Modo demostración: guardado solo en este dispositivo". **No se deben ingresar datos reales** (cédulas, direcciones, fotos) hasta tener autenticación y RLS. | Lo exige la especificación; el código y los datos de ejemplo son visibles para quien abra el enlace. |
 | T14 | Sin "eliminar" en las listas: **archivar** (borrado lógico) con filtro "Archivados" para verlos y restaurarlos. | Así no se rompen viajes o cargas que apunten al registro. |
+| T16 | Fotos: se reducen en el navegador antes de guardar (lado mayor 800 px; foto del chofer 400 px; JPEG 0.7) respetando la orientación de la cámara. La foto nueva se guarda solo si el registro se guarda; la reemplazada o quitada se borra después. | Lo pide la especificación y evita fotos huérfanas. |
+| T17 | Tocar un chofer abre su **ficha** (foto, datos, Llamar, WhatsApp) y desde ahí "Editar". Los teléfonos se marcan con código de país 1 (`tel:+1…`, `wa.me/1…`). | La especificación pide la ficha con esos botones. |
+| T18 | El botón de WhatsApp usa el verde oscuro de la marca (`#075E54`), no el verde claro (`#25D366`). | Con texto blanco, el claro tiene contraste ~2:1 y no pasa AA. |
+| T19 | Vehículos: el kilometraje actual es el mayor registrado en sus cargas de combustible; con él se calcula el aviso de mantenimiento por km. | La especificación dice "según el último kilometraje registrado". |
 | T15 | Horas en 12 h con a. m./p. m.; fechas **dd/mm/aaaa** (la fecha larga solo en títulos); dinero RD$ con separador de miles. | Formato pedido. |
 
 ## Validaciones

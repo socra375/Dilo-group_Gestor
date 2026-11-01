@@ -1,6 +1,8 @@
 // Formularios generados desde los esquemas (src/core/esquemas.js) y CONFIG: render, lectura, validación y hoja inferior.
 import { esc, abrirHoja, toast, icon } from './ui.js';
-import { unidad, telefono, cedula } from './format.js';
+import { unidad, telefono, cedula, horaTexto } from './format.js';
+import { reducirImagen, pintarFotos, olvidarFoto, LADO_FOTO } from './fotos.js';
+import { guardarFoto, borrarFoto } from '../data/store.js';
 
 const solo = (v, re) => String(v ?? '').replace(re, '');
 
@@ -13,13 +15,35 @@ function opcionesReferencia(campo, refs, valor) {
   return `<option value="">Selecciona…</option>${ops.join('')}`;
 }
 
+const chipHora = (h) => `<li class="chip chip--neutro chip--plain hora-chip">${esc(horaTexto(h))}<button type="button" class="hora-chip__quitar" data-quitar-hora="${esc(h)}" aria-label="Quitar ${esc(horaTexto(h))}">${icon('x', 'icon--sm')}</button></li>`;
+
 function controlHTML(c, valor, refs) {
   const id = `f-${c.clave}`;
-  const comun = `id="${id}" name="${c.clave}" aria-describedby="${id}-err${c.ayuda ? ` ${id}-help` : ''}" ${c.requerido ? 'aria-required="true"' : ''}`;
+  const describe = `${id}-err${c.soloAdvertir ? ` ${id}-warn` : ''}${c.ayuda ? ` ${id}-help` : ''}`;
+  const comun = `id="${id}" name="${c.clave}" aria-describedby="${describe}" ${c.requerido ? 'aria-required="true"' : ''}`;
   let v = valor ?? '';
   if (c.tipo === 'telefono') v = telefono(v).replace(/[()]/g, '').replace(' ', '-');
   if (c.tipo === 'cedula') v = cedula(v);
   switch (c.tipo) {
+    case 'foto':
+      // El valor es el id de la foto guardada; las nuevas se reducen al elegirlas y se guardan al enviar.
+      return `<div class="foto-campo" data-foto-campo="${c.clave}">
+        <span class="foto-campo__marco" data-foto-marco>${v ? `<img alt="Foto actual" data-foto="${esc(v)}">` : icon('camera')}</span>
+        <span class="foto-campo__acciones">
+          <label class="btn btn--secondary btn--sm" for="${id}">${icon('camera', 'icon--sm')}<span data-foto-texto>${v ? 'Cambiar foto' : 'Agregar foto'}</span></label>
+          <button type="button" class="btn btn--ghost btn--sm" data-quitar-foto ${v ? '' : 'hidden'}>Quitar</button>
+        </span>
+        <input type="hidden" name="${c.clave}" value="${esc(v)}">
+        <input type="file" accept="image/*" id="${id}" class="sr-only" data-foto-archivo="${c.clave}" aria-describedby="${describe}">
+      </div>`;
+    case 'horas': {
+      const lista = Array.isArray(valor) ? valor : [];
+      return `<div class="horas" data-horas="${c.clave}">
+        <input type="hidden" name="${c.clave}" value="${esc(JSON.stringify(lista))}">
+        <ul class="horas__lista" aria-live="polite">${lista.map(chipHora).join('')}</ul>
+        <div class="horas__nueva"><input class="input" type="time" id="${id}" aria-describedby="${describe}"><button type="button" class="btn btn--secondary btn--sm" data-agregar-hora>${icon('plus', 'icon--sm')}Agregar</button></div>
+      </div>`;
+    }
     case 'notas':
       return `<textarea class="textarea" ${comun} maxlength="${c.max || 500}" rows="3">${esc(v)}</textarea>`;
     case 'seleccion':
@@ -52,12 +76,13 @@ function controlHTML(c, valor, refs) {
 
 export function campoHTML(c, valor, refs = {}) {
   const id = `f-${c.clave}`;
-  const ancho = ['notas', 'texto', 'referencia', 'telefono', 'cedula'].includes(c.tipo) || !c.grupo ? 'field--full' : '';
+  const ancho = ['notas', 'texto', 'referencia', 'telefono', 'cedula', 'foto', 'horas'].includes(c.tipo) || !c.grupo ? 'field--full' : '';
   return `<div class="field ${ancho}" data-campo="${c.clave}">
     <label class="field__label" for="${id}">${esc(c.etiqueta)}${c.requerido ? ' <span class="req" aria-hidden="true">*</span>' : ''}</label>
     ${controlHTML(c, valor, refs)}
     ${c.ayuda ? `<p class="field__help" id="${id}-help">${esc(c.ayuda)}</p>` : ''}
     <p class="field__error" id="${id}-err" aria-live="polite"></p>
+    ${c.soloAdvertir ? `<p class="field__warn" id="${id}-warn" aria-live="polite"></p>` : ''}
   </div>`;
 }
 
@@ -99,9 +124,22 @@ export function leerValores(form, campos) {
     const t = typeof crudo === 'string' ? crudo.trim() : '';
     switch (c.tipo) {
       case 'telefono':
-      case 'cedula':
         out[c.clave] = solo(t, /\D/g);
         break;
+      case 'cedula': {
+        // Con 11 dígitos se guarda limpia; si la escribieron distinto se conserva tal cual (solo se advierte).
+        const d = solo(t, /\D/g);
+        out[c.clave] = d.length === 11 ? d : t;
+        break;
+      }
+      case 'horas': {
+        const lista = new Set(JSON.parse(t || '[]'));
+        // Una hora escrita pero sin pulsar "Agregar" también cuenta.
+        const pendiente = form.querySelector(`[data-horas="${c.clave}"] input[type="time"]`)?.value;
+        if (/^\d{2}:\d{2}$/.test(pendiente || '')) lista.add(pendiente);
+        out[c.clave] = [...lista].sort();
+        break;
+      }
       case 'placa':
         out[c.clave] = solo(t.toUpperCase(), /[^A-Z0-9]/g);
         break;
@@ -116,11 +154,11 @@ export function leerValores(form, campos) {
   return out;
 }
 
-export function validar(campos, valores) {
+function revisar(campos, valores) {
   const err = {};
   for (const c of campos) {
     const v = valores[c.clave];
-    const vacio = v === '' || v == null;
+    const vacio = v === '' || v == null || (Array.isArray(v) && !v.length);
     if (vacio) {
       if (c.requerido) err[c.clave] = ['seleccion', 'referencia'].includes(c.tipo) ? 'Selecciona una opción.' : 'Este campo es obligatorio.';
       continue;
@@ -130,7 +168,10 @@ export function validar(campos, valores) {
         if (!/^(809|829|849)\d{7}$/.test(v)) err[c.clave] = 'Escribe 10 dígitos que empiecen por 809, 829 o 849.';
         break;
       case 'cedula':
-        if (!/^\d{11}$/.test(v)) err[c.clave] = 'La cédula tiene 11 dígitos (ej. 001-1234567-8).';
+        if (!/^\d{11}$/.test(v)) err[c.clave] = 'La cédula dominicana tiene 11 dígitos (ej. 001-1234567-8). Se guardará como la escribiste.';
+        break;
+      case 'horas':
+        if (v.some((h) => !/^\d{2}:\d{2}$/.test(h))) err[c.clave] = 'Hay una hora no válida.';
         break;
       case 'fecha':
         if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) err[c.clave] = 'Fecha no válida.';
@@ -153,11 +194,29 @@ export function validar(campos, valores) {
   return err;
 }
 
+/** Errores que impiden guardar (los campos `soloAdvertir` nunca bloquean). */
+export function validar(campos, valores) {
+  const todos = revisar(campos, valores);
+  return Object.fromEntries(Object.entries(todos).filter(([k]) => !campos.find((c) => c.clave === k)?.soloAdvertir));
+}
+
+/** Avisos que no impiden guardar (p. ej. cédula con formato distinto). */
+export function advertencias(campos, valores) {
+  const todos = revisar(campos, valores);
+  return Object.fromEntries(Object.entries(todos).filter(([k]) => campos.find((c) => c.clave === k)?.soloAdvertir));
+}
+
+function mostrarAdvertencias(form, avisos) {
+  for (const p of form.querySelectorAll('.field__warn')) {
+    p.textContent = avisos[p.closest('[data-campo]').dataset.campo] || '';
+  }
+}
+
 export function mostrarErrores(form, errores) {
   let primero = null;
   for (const campo of form.querySelectorAll('[data-campo]')) {
     const clave = campo.dataset.campo;
-    const control = campo.querySelector('input, select, textarea');
+    const control = campo.querySelector('input:not([type="hidden"]), select, textarea');
     const msg = errores[clave] || '';
     campo.querySelector('.field__error').textContent = msg;
     if (msg) {
@@ -189,6 +248,8 @@ export function abrirFormulario({ titulo, campos, valores = {}, refs = {}, grupo
   });
   const form = hoja.el.querySelector('form');
   const enviar = hoja.el.querySelector('button[type="submit"]');
+  const fotosNuevas = {}; // clave → Blob ya reducido, pendiente de guardar
+  pintarFotos(form);
 
   form.addEventListener('input', (e) => {
     const campo = e.target.closest('[data-campo]');
@@ -197,16 +258,107 @@ export function abrirFormulario({ titulo, campos, valores = {}, refs = {}, grupo
       e.target.removeAttribute('aria-invalid');
     }
   });
+  // Las advertencias (no bloquean) se muestran al salir del campo, antes de guardar.
+  form.addEventListener('change', (e) => {
+    if (e.target.closest('[data-campo]') && campos.some((c) => c.soloAdvertir)) mostrarAdvertencias(form, advertencias(campos, leerValores(form, campos)));
+  });
   if (alCambiar) form.addEventListener('change', (e) => alCambiar(leerValores(form, campos), form, e.target.name));
+
+  // ---- Fotos ----
+  const pintarFoto = (clave, url) => {
+    const cont = form.querySelector(`[data-foto-campo="${clave}"]`);
+    cont.querySelector('[data-foto-marco]').innerHTML = url ? `<img alt="Foto nueva" src="${url}">` : icon('camera');
+    cont.querySelector('[data-foto-texto]').textContent = url ? 'Cambiar foto' : 'Agregar foto';
+    cont.querySelector('[data-quitar-foto]').hidden = !url;
+  };
+  form.addEventListener('change', async (e) => {
+    const entrada = e.target.closest('[data-foto-archivo]');
+    if (!entrada) return;
+    const clave = entrada.dataset.fotoArchivo;
+    const archivo = entrada.files?.[0];
+    entrada.value = '';
+    if (!archivo) return;
+    const error = form.querySelector(`[data-campo="${clave}"] .field__error`);
+    try {
+      const campo = campos.find((c) => c.clave === clave);
+      fotosNuevas[clave] = await reducirImagen(archivo, campo.lado || LADO_FOTO);
+      pintarFoto(clave, URL.createObjectURL(fotosNuevas[clave]));
+      error.textContent = '';
+    } catch (x) {
+      error.textContent = x.message || 'No se pudo leer la foto.';
+    }
+  });
+
+  // ---- Horarios ----
+  const pintarHoras = (cont, lista) => {
+    cont.querySelector('input[type="hidden"]').value = JSON.stringify(lista);
+    cont.querySelector('.horas__lista').innerHTML = lista.map(chipHora).join('');
+  };
+  const agregarHora = (cont) => {
+    const entrada = cont.querySelector('input[type="time"]');
+    if (!/^\d{2}:\d{2}$/.test(entrada.value)) return;
+    const lista = new Set(JSON.parse(cont.querySelector('input[type="hidden"]').value || '[]'));
+    lista.add(entrada.value);
+    pintarHoras(cont, [...lista].sort());
+    entrada.value = '';
+    entrada.focus();
+  };
+  form.addEventListener('keydown', (e) => {
+    const cont = e.target.closest('[data-horas]');
+    if (cont && e.key === 'Enter') {
+      e.preventDefault(); // Enter agrega la hora, no envía el formulario
+      agregarHora(cont);
+    }
+  });
+
+  form.addEventListener('click', (e) => {
+    const quitarFoto = e.target.closest('[data-quitar-foto]');
+    if (quitarFoto) {
+      const cont = quitarFoto.closest('[data-foto-campo]');
+      const clave = cont.dataset.fotoCampo;
+      delete fotosNuevas[clave];
+      cont.querySelector('input[type="hidden"]').value = '';
+      pintarFoto(clave, null);
+      return;
+    }
+    if (e.target.closest('[data-agregar-hora]')) return agregarHora(e.target.closest('[data-horas]'));
+    const quitarHora = e.target.closest('[data-quitar-hora]');
+    if (quitarHora) {
+      const cont = quitarHora.closest('[data-horas]');
+      const lista = JSON.parse(cont.querySelector('input[type="hidden"]').value || '[]').filter((h) => h !== quitarHora.dataset.quitarHora);
+      pintarHoras(cont, lista);
+    }
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const v = leerValores(form, campos);
     const errores = { ...validar(campos, v), ...(validarExtra?.(v) || {}) };
     if (!mostrarErrores(form, errores)) return;
+    const avisos = advertencias(campos, v);
     enviar.disabled = true;
+    const creadas = [];
     try {
-      await guardar(v);
+      for (const [clave, blob] of Object.entries(fotosNuevas)) {
+        v[clave] = await guardarFoto(blob);
+        creadas.push(v[clave]);
+      }
+      try {
+        await guardar(v);
+      } catch (err) {
+        for (const id of creadas) await borrarFoto(id); // no dejar fotos huérfanas
+        throw err;
+      }
+      // Fotos reemplazadas o quitadas: se borran solo después de guardar bien.
+      for (const c of campos.filter((x) => x.tipo === 'foto')) {
+        const antes = valores[c.clave];
+        if (antes && antes !== v[c.clave]) {
+          await borrarFoto(antes);
+          olvidarFoto(antes);
+        }
+      }
+      const primerAviso = Object.values(avisos)[0];
+      if (primerAviso) toast(`Guardado. Ojo: ${primerAviso}`, 'info', 4500);
       await hoja.cerrar();
     } catch (err) {
       if (err?.errores) mostrarErrores(form, err.errores);

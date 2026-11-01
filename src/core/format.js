@@ -20,6 +20,9 @@ export function numero(n, decimales = 0) {
 }
 
 export const hora = (iso) => (iso ? fmtHora.format(new Date(iso)) : '—');
+const fmtHoraFija = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', hour: 'numeric', minute: '2-digit', hour12: true });
+/** '05:30' → '5:30 a. m.' (hora de reloj, sin fecha ni zona). */
+export const horaTexto = (hhmm) => (/^\d{2}:\d{2}$/.test(hhmm || '') ? fmtHoraFija.format(new Date(`2000-01-01T${hhmm}:00Z`)) : '—');
 
 // Las fechas clave ('YYYY-MM-DD') se formatean a mediodía UTC para que ninguna zona las corra de día.
 const deClave = (clave) => new Date(`${clave}T12:00:00Z`);

@@ -127,6 +127,68 @@ async function espera(cond, ms = 4000) {
   await page.click('dialog.sheet button[type=submit]');
   ok(await espera(async () => (await page.textContent('#f-placa-err')).includes('Ya existe')), 'placa duplicada rechazada');
 
+  // ---- Fase 2: choferes (ficha, foto, cédula), rutas (horarios), vehículos (vencimientos) ----
+  await page.evaluate(() => { location.hash = '#/choferes'; });
+  await page.waitForSelector('[data-lista] .item');
+  await page.locator('.item', { hasText: 'Ramón Antonio Féliz' }).locator('[data-editar]').click();
+  await page.waitForSelector('dialog.sheet .ficha');
+  const llamar = await page.getAttribute('dialog.sheet .ficha a.btn--primary', 'href');
+  const wa = await page.getAttribute('dialog.sheet .ficha a.btn--whatsapp', 'href');
+  ok(llamar === 'tel:+18095550102' && wa === 'https://wa.me/18095550102', `ficha con Llamar (${llamar}) y WhatsApp (${wa})`);
+  ok((await page.textContent('dialog.sheet .ficha')).includes('Licencia vence en 10 días'), 'ficha muestra la licencia por vencer');
+
+  // Editar desde la ficha: foto (se reduce a 400 px JPEG) y cédula con otro formato (solo advierte).
+  await page.click('[data-editar-ficha]');
+  await page.waitForSelector('dialog.sheet form #f-nombre');
+  ok(await page.locator('[data-quitar-foto]').isHidden(), 'sin foto, el botón "Quitar" no se muestra');
+  await page.setInputFiles('#f-fotoId', require('path').resolve(__dirname, '../icons/icon-512.png'));
+  await page.waitForSelector('[data-foto-campo="fotoId"] img');
+  ok(await page.locator('[data-quitar-foto]').isVisible(), 'con foto nueva aparece "Quitar"');
+  await page.fill('#f-cedula', '12345');
+  await page.dispatchEvent('#f-cedula', 'change');
+  ok((await page.textContent('#f-cedula-warn')).includes('11 dígitos'), 'cédula con otro formato muestra advertencia');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const ramon = (await leer(page, 'choferes')).find((c) => c.nombre === 'Ramón Antonio Féliz');
+  ok(ramon.cedula === '12345', 'la cédula se guarda aunque no tenga 11 dígitos (no bloquea)');
+  const foto = await page.evaluate(async (id) => {
+    const blob = await (await import('/src/data/store.js')).leerFoto(id);
+    const bmp = await createImageBitmap(blob);
+    return { tipo: blob.type, ancho: bmp.width, alto: bmp.height };
+  }, ramon.fotoId);
+  ok(foto.tipo === 'image/jpeg' && Math.max(foto.ancho, foto.alto) === 400, `foto del chofer reducida a JPEG ${foto.ancho}×${foto.alto}`);
+  ok(await espera(async () => (await page.locator('.item', { hasText: 'Ramón Antonio Féliz' }).locator('.avatar img[src^="blob:"]').count()) === 1), 'la lista muestra la foto del chofer');
+
+  // Quitar la foto la borra del almacén.
+  await page.locator('.item', { hasText: 'Ramón Antonio Féliz' }).locator('[data-editar]').click();
+  await page.click('[data-editar-ficha]');
+  await page.click('[data-quitar-foto]');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const borrada = await page.evaluate(async (id) => (await (await import('/src/data/store.js')).leerFoto(id)) === null, ramon.fotoId);
+  ok(borrada && !(await leer(page, 'choferes')).find((c) => c.nombre === 'Ramón Antonio Féliz').fotoId, 'quitar la foto la borra del almacén');
+
+  // Rutas: agregar y quitar horarios fijos.
+  await page.evaluate(() => { location.hash = '#/rutas'; });
+  await page.waitForSelector('[data-lista] .item');
+  ok((await page.textContent('[data-lista]')).includes('Salidas: 5:30 a. m., 3:30 p. m.'), 'la lista de rutas muestra los horarios en 12 h');
+  await page.locator('.item', { hasText: 'R1 Alcarrizos' }).locator('[data-editar]').click();
+  await page.fill('#f-horarios', '07:15');
+  await page.click('[data-agregar-hora]');
+  await page.click('[data-quitar-hora="05:30"]');
+  await page.fill('#f-horarios', '18:45'); // escrita sin pulsar "Agregar": también se guarda
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const r1 = (await leer(page, 'rutas')).find((r) => r.nombre.startsWith('R1'));
+  ok(JSON.stringify(r1.horarios) === JSON.stringify(['07:15', '15:30', '18:45']), `horarios guardados en orden: ${r1.horarios.join(', ')}`);
+
+  // Vehículos: avisos de seguro y mantenimiento en la lista.
+  await page.evaluate(() => { location.hash = '#/vehiculos'; });
+  await page.waitForSelector('[data-lista] .item');
+  const textoVeh = await page.textContent('[data-lista]');
+  ok(textoVeh.includes('Seguro vence en 12 días'), 'vehículo con seguro por vencer avisa');
+  ok(/Mantenimiento: faltan 350 km/.test(textoVeh), 'vehículo con mantenimiento próximo por km avisa');
+
   // Reportes: CSV descargable.
   await page.evaluate(() => { location.hash = '#/reportes'; });
   await page.waitForSelector('[data-csv="chofer"]');
