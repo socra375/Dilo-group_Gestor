@@ -93,6 +93,14 @@ function controlHTML(c, valor, refs) {
 
 export function campoHTML(c, valor, refs = {}) {
   const id = `f-${c.clave}`;
+  if (c.tipo === 'casilla') {
+    const marcado = valor === undefined || valor === null ? c.porDefecto === true : valor === true;
+    return `<div class="field field--full" data-campo="${c.clave}">
+      <label class="switch" for="${id}"><span><strong>${esc(c.etiqueta)}</strong>${c.ayuda ? `<br><small class="muted" id="${id}-help">${esc(c.ayuda)}</small>` : ''}</span>
+        <input type="checkbox" role="switch" id="${id}" name="${c.clave}" ${marcado ? 'checked' : ''} aria-describedby="${id}-err${c.ayuda ? ` ${id}-help` : ''}"></label>
+      <p class="field__error" id="${id}-err" aria-live="polite"></p>
+    </div>`;
+  }
   // Las horas con atajo "Ahora" van en fila completa: en media columna el botón no cabe.
   const ancho = ['notas', 'texto', 'referencia', 'telefono', 'cedula', 'foto', 'horas', 'motivo'].includes(c.tipo) || !c.grupo || (c.ahora && CONFIG.viajes.atajo_ahora) ? 'field--full' : '';
   return `<div class="field ${ancho}" data-campo="${c.clave}">
@@ -164,6 +172,9 @@ export function leerValores(form, campos) {
       case 'numero':
       case 'dinero':
         out[c.clave] = aNumero(t);
+        break;
+      case 'casilla':
+        out[c.clave] = crudo === 'on';
         break;
       default:
         out[c.clave] = t;

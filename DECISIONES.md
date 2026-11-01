@@ -31,7 +31,10 @@ Cada uno se cambia sin tocar la lógica, en el lugar indicado.
 | Motivos rápidos en chips (el chofer elige o escribe "Otro"), para que obligatorio no signifique escribir "no sé" | Tráfico, Lluvia, Avería, Accidente en la vía, Pasajeros tarde, Otro | `MOTIVOS_RETRASO` en `esquemas.js` |
 | Módulo de asistencia del chofer (lo mencionó en la llamada, no en el cuestionario) | activo | `CONFIG.modulos.asistencia` |
 | "Choferes activos" = choferes no archivados (el cuestionario no pide un campo "estado" para choferes) | — | `esquemas.js` si se quiere un estado |
-| Rendimiento km/galón: solo entre cargas de **tanque lleno** (si una carga no llenó el tanque, el cálculo da números falsos y dispararía el aviso de combustible alto) | casilla "Tanque lleno", marcada por defecto | fase 4 |
+| Rendimiento km/galón con el método **tanque lleno a tanque lleno**: en cada carga llena, km recorridos desde la carga llena anterior ÷ galones echados en ese tramo (las parciales suman). Comparar solo "contra la carga anterior" da números falsos si esa carga no llenó el tanque | casilla "Tanque lleno", marcada por defecto | `PARAMETROS.campoTanqueLleno` en `esquemas.js` (en `false` se oculta y todas cuentan como llenas) |
+| "Combustible más alto de lo normal" necesita al menos **2 rendimientos previos** del vehículo dentro de los 30 días para tener un "normal"; con menos, no avisa | 2 | `MIN_CARGAS_PROMEDIO` en `avisos.js` |
+| Aviso de viaje retrasado: los de **hoy** que llegaron tarde (atención) y los de hoy o ayer cuya llegada + tolerancia pasó **sin llegada registrada** (urgente) | — | `calcularAvisos` en `avisos.js` |
+| Recordatorio de **respaldo** en Inicio (no está en los 5 avisos del cliente): se mantiene mientras los datos vivan solo en el teléfono | cada 7 días | `PARAMETROS.diasAvisoRespaldo` |
 | Formato de placa RD (1–2 letras + 5–6 dígitos): igual que la cédula, **solo advierte** y guarda lo escrito (hay placas especiales) | advertencia | `esquemas.js` → `vehiculos.placa` (`soloAdvertir`) |
 | Respaldo recomendado cada 7 días; turno abierto largo a las 12 h | 7 días / 12 h | `PARAMETROS` en `esquemas.js` |
 | Precios de combustible en los datos de ejemplo | Gasoil RD$235.10, Gasolina RD$272.50 por galón | `src/data/seed.js` |
@@ -64,6 +67,8 @@ Cada uno se cambia sin tocar la lógica, en el lugar indicado.
 | T22 | El motivo del retraso aparece solo cuando la llegada escrita supera la tolerancia; es obligatorio si `CONFIG.viajes.motivo = 'obligatorio_si_retraso'`. Si se corrige la hora y deja de haber retraso, el motivo se borra al guardar. | Interpretación de "Sí, siempre" (supuesto arriba). |
 | T23 | "Generar viajes de hoy" (o del día elegido) crea un viaje por cada horario fijo de cada ruta activa, sin chofer ni vehículo, con la llegada = salida + duración normal. No duplica: si ya existe ese viaje (no archivado), lo omite. Por eso chofer y vehículo ya **no son obligatorios** al crear; la tarjeta muestra "Sin chofer" / "Sin vehículo". | El supervisor los asigna después, como pide la especificación. |
 | T24 | Los avisos breves (toasts) no capturan toques y se ven como máximo 2 a la vez. | Las pruebas encontraron que, al encadenar acciones, se apilaban y tapaban los botones: un toque podía no responder. |
+| T25 | Cada aviso tiene severidad (**urgente**: vencido, dentro del umbral menor o sin llegada; **atención**: el resto) y abre su ficha: `#/choferes?abrir=…`, `#/vehiculos?abrir=…`, `#/viajes?fecha=…&abrir=…`, `#/combustible?abrir=…`. El aviso de "turno abierto más de 12 h" de la versión anterior se quitó (no está entre los avisos pedidos; `chofer_sin_entrada` está en `false`). | Lo pide la especificación. |
+| T26 | Combustible: fecha y hora como dos campos; el tipo por defecto es el primero de `CONFIG.combustible.tipos`; el kilometraje es un número entero; precio por galón y rendimiento se calculan y muestran en la lista (o el motivo por el que aún no se puede). | — |
 | T15 | Horas en 12 h con a. m./p. m.; fechas **dd/mm/aaaa** (la fecha larga solo en títulos); dinero RD$ con separador de miles. | Formato pedido. |
 
 ## Validaciones

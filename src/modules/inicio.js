@@ -7,7 +7,7 @@ import { hoyClave, sumarDias, fechaClave, estadoViaje, diasEntre } from '../core
 import * as fmt from '../core/format.js';
 import { esc, icon, vacio, animarContador, escalonar, conCarga } from '../core/ui.js';
 import { tarjetaViaje, refsViajes, abrirRegistro, abrirViaje } from './viajes.js';
-import { avisoLicencia, turnoAbierto, turnoLargo } from './choferes.js';
+import { calcularAvisos } from '../core/avisos.js';
 
 let contadoresAnimados = false;
 
@@ -27,7 +27,7 @@ function saludo() {
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 
-function calcular({ viajes, combustible, choferes, turnos }) {
+function calcular({ viajes, combustible, choferes, refs }) {
   const ahora = new Date();
   const hoy = hoyClave();
   const tol = tolerancia();
@@ -49,36 +49,15 @@ function calcular({ viajes, combustible, choferes, turnos }) {
     },
   };
 
-  const op = INICIO.avisos;
-  const avisos = [];
-  if (op.sinLlegada) {
-    // Hoy y ayer: un viaje nocturno de ayer sin cerrar también importa.
-    const sin = conEstado.filter(({ v, e }) => e.estado === 'sin_llegada' && fechaClave(v.salidaProg) >= sumarDias(hoy, -1));
-    if (sin.length) avisos.push({ tono: 'error', titulo: `${fmt.plural(sin.length, 'viaje', 'viajes')} sin llegada registrada`, texto: 'La hora de llegada programada ya pasó.', href: '#/viajes?filtro=retrasados' });
-  }
-  if (op.salidaPendiente) {
-    const pend = deHoy.filter(({ e }) => e.estado === 'programado' && e.salidaAtrasada);
-    if (pend.length) avisos.push({ tono: 'aviso', titulo: `${fmt.plural(pend.length, 'salida pendiente', 'salidas pendientes')}`, texto: 'Pasó la hora de salida y no se ha marcado.', href: '#/viajes?filtro=pendientes' });
-  }
-  if (op.licencias) {
-    for (const c of choferes.filter((x) => !x.archivado)) {
-      const a = avisoLicencia(c, hoy);
-      if (a) avisos.push({ tono: a.tono, titulo: c.nombre, texto: a.texto, href: '#/choferes' });
-    }
-  }
-  if (op.turnoLargo) {
-    for (const c of choferes.filter((x) => !x.archivado)) {
-      const t = turnoAbierto(turnos, c.id);
-      if (t && turnoLargo(t, ahora)) avisos.push({ tono: 'aviso', titulo: `${c.nombre} lleva más de ${PARAMETROS.horasTurnoLargo} h en turno`, texto: `Entrada: ${fmt.fecha(t.fecha)}, ${fmt.hora(t.entrada)}. ¿Falta marcar la salida?`, href: '#/choferes' });
-    }
-  }
-  if (op.respaldo) {
-    const reales = [viajes, combustible, choferes].some((l) => l.some((x) => !x.ejemplo));
-    const ultimo = pref('ultimoRespaldo');
-    const dias = ultimo ? diasEntre(fechaClave(ultimo), hoy) : null;
-    if (reales && (dias === null || dias > PARAMETROS.diasAvisoRespaldo)) {
-      avisos.push({ tono: 'info', titulo: 'Haz un respaldo de tus datos', texto: dias === null ? 'Aún no has exportado ningún respaldo.' : `El último fue hace ${fmt.plural(dias, 'día', 'días')}.`, href: '#/ajustes' });
-    }
+  // Los 5 avisos del cliente (viaje retrasado, licencia, seguro, mantenimiento, combustible alto).
+  const avisos = calcularAvisos({ viajes, choferes, combustible, vehiculos: refs.listas.vehiculos, rutas: refs.listas.rutas }, { hoy, ahora, tolerancia: tol })
+    .map((a) => ({ tono: a.severidad === 'urgente' ? 'error' : 'aviso', titulo: a.titulo, texto: a.texto, href: a.href }));
+  // SUPUESTO: recordatorio de respaldo mientras los datos vivan solo en este teléfono.
+  const reales = [viajes, combustible, choferes].some((l) => l.some((x) => !x.ejemplo));
+  const ultimo = pref('ultimoRespaldo');
+  const dias = ultimo ? diasEntre(fechaClave(ultimo), hoy) : null;
+  if (reales && (dias === null || dias > PARAMETROS.diasAvisoRespaldo)) {
+    avisos.push({ tono: 'info', titulo: 'Haz un respaldo de tus datos', texto: dias === null ? 'Aún no has exportado ningún respaldo.' : `El último fue hace ${fmt.plural(dias, 'día', 'días')}.`, href: '#/ajustes' });
   }
 
   const orden = { sin_llegada: 0, en_ruta: 1, programado: 2, completado: 3 };
@@ -110,7 +89,7 @@ export default {
         3,
       );
       ultimos = { viajes, refs };
-      const d = calcular({ viajes, combustible, choferes, turnos });
+      const d = calcular({ viajes, combustible, choferes, refs });
       const bloques = {
         totales: () => `<section class="section" aria-label="Totales del día"><div class="stats">${INICIO.totales
           .filter((t) => t.activo)

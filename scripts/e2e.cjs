@@ -224,6 +224,50 @@ async function espera(cond, ms = 4000) {
   ok(textoVeh.includes('Seguro vence en 12 días'), 'vehículo con seguro por vencer avisa');
   ok(/Mantenimiento: faltan 350 km/.test(textoVeh), 'vehículo con mantenimiento próximo por km avisa');
 
+  // ---- Fase 4: combustible (rendimiento, precio por galón, recibo) y avisos ----
+  await ir(page, 'combustible');
+  await page.waitForSelector('[data-lista] .item');
+  ok((await page.locator('.item', { hasText: 'I067310' }).first().textContent()).includes('más alto de lo normal'), 'la carga anómala de los datos de ejemplo se marca');
+  const kmAntes = Math.max(...(await leer(page, 'combustible')).filter((c) => c.vehiculoId === 'ej-vehiculo-1').map((c) => c.km));
+  await page.click('[data-nuevo]');
+  await page.waitForSelector('dialog.sheet form #f-cantidad');
+  ok((await page.inputValue('#f-fecha')) === (await page.evaluate(async () => (await import('/src/core/time.js')).hoyClave())), 'la carga nueva trae la fecha de hoy');
+  ok(await page.isChecked('#f-tanqueLleno'), '"Tanque lleno" viene marcado');
+  ok((await page.inputValue('#f-tipo')) === 'Gasoil', 'tipo por defecto: Gasoil');
+  await page.selectOption('#f-vehiculoId', { label: 'I045821' });
+  await page.fill('#f-cantidad', '20');
+  await page.fill('#f-monto', '4,702');
+  await page.fill('#f-km', String(kmAntes + 480));
+  await page.fill('#f-estacion', 'Estación de prueba');
+  await page.setInputFiles('#f-fotoId', require('path').resolve(__dirname, '../icons/icon-512.png'));
+  await page.waitForSelector('[data-foto-campo="fotoId"] img');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const nueva = page.locator('[data-lista] .item', { hasText: 'Estación de prueba' });
+  ok(await espera(async () => (await nueva.count()) === 1), 'carga guardada');
+  const textoCarga = await nueva.textContent();
+  ok(textoCarga.includes('24.0 km/gal'), 'rendimiento calculado: 480 km ÷ 20 gal = 24.0 km/gal');
+  ok(textoCarga.includes('RD$235.10/gal'), 'precio por galón: RD$235.10');
+  const cargaGuardada = (await leer(page, 'combustible')).find((c) => c.estacion === 'Estación de prueba');
+  const recibo = await page.evaluate(async (id) => {
+    const blob = await (await import('/src/data/store.js')).leerFoto(id);
+    const bmp = await createImageBitmap(blob);
+    return Math.max(bmp.width, bmp.height);
+  }, cargaGuardada.fotoId);
+  ok(recibo <= 800 && cargaGuardada.monto === 4702, `foto del recibo guardada (${recibo} px) y monto leído con separador de miles`);
+
+  // Avisos en Inicio y cada uno abre su ficha.
+  await ir(page, 'inicio');
+  await page.waitForSelector('.stat');
+  const avisosTexto = await page.textContent('[data-avisos]');
+  ok(avisosTexto.includes('Licencia vence en 10 días'), 'aviso: licencia por vencer');
+  ok(avisosTexto.includes('Seguro vence en 12 días'), 'aviso: seguro por vencer');
+  ok(/Mantenimiento: faltan 350 km/.test(avisosTexto), 'aviso: mantenimiento por kilometraje');
+  ok(/peor que su promedio/.test(avisosTexto), 'aviso: combustible más alto de lo normal');
+  await page.locator('[data-avisos] a', { hasText: 'Seguro vence' }).click();
+  ok(await espera(async () => (await page.locator('dialog.sheet[open] #f-placa').count()) === 1 && (await page.inputValue('#f-placa')) === 'I067310'), 'el aviso de seguro abre la ficha del vehículo');
+  await page.keyboard.press('Escape');
+
   // Reportes: CSV descargable.
   await ir(page, 'reportes');
   await page.waitForSelector('[data-csv="chofer"]');

@@ -226,6 +226,12 @@ export function pantallaCrud(op) {
 
       await cargar(true);
       if (params.nuevo === '1') abrir(null);
+      // Desde un aviso: "#/vehiculos?abrir=<id>" abre la ficha o el formulario de ese registro.
+      const pedido = params.abrir && items.find((x) => x.id === params.abrir);
+      if (pedido) {
+        if (op.alAbrir && !pedido.archivado) op.alAbrir(pedido, { refs, editar: () => abrir(pedido), recargar: cargar });
+        else abrir(pedido);
+      }
     },
   };
 }

@@ -315,7 +315,7 @@ export default {
     const cambiarFecha = (f) => {
       est.fecha = f;
       el.querySelector('[data-fecha]').value = f;
-      history.replaceState(null, '', `#/viajes?fecha=${f}`);
+      history.replaceState(null, '', `#/viajes?fecha=${f}`); // sin "abrir": no reabrir al refrescar
       pintar(true);
     };
 
@@ -355,6 +355,8 @@ export default {
 
     await cargar(true);
     if (params.nuevo === '1') abrirViaje(null, refs, { fecha: est.fecha, alGuardar: () => cargar() });
+    const pedido = params.abrir && viajes.find((v) => v.id === params.abrir);
+    if (pedido) abrirViaje(pedido, refs, { alGuardar: () => cargar() });
 
     // Los estados dependen de la hora: repintar cada minuto mientras la pantalla esté abierta.
     const reloj = setInterval(() => pintar(), 60000);

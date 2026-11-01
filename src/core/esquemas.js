@@ -21,6 +21,9 @@ export const MOTIVOS_RETRASO = ['Tráfico', 'Lluvia', 'Avería', 'Accidente en l
 export const PARAMETROS = {
   diasAvisoRespaldo: 7,
   horasTurnoLargo: 12,
+  // Casilla "Tanque lleno" en cada carga (para un rendimiento correcto). En false se oculta y todas
+  // las cargas cuentan como tanque lleno.
+  campoTanqueLleno: true,
 };
 
 // Puntos de extensión (el cliente los quiere a futuro). Carpeta: src/modules/extensiones/<carpeta>/index.js.
@@ -38,6 +41,8 @@ export const GRUPOS = {
   emergencia: 'Contacto de emergencia',
   seguro: 'Seguro',
   mantenimiento: 'Próximo mantenimiento',
+  cuando: 'Cuándo',
+  carga: 'Carga',
   programado: 'Horario programado',
   real: 'Horario real',
 };
@@ -116,11 +121,17 @@ const ESQUEMAS = {
   ],
 
   combustible: [
-    { clave: 'fecha', cfg: 'fecha_hora', etiqueta: 'Fecha', tipo: 'fecha', requerido: true, fijo: true, enLista: 'meta' },
-    { clave: 'vehiculoId', cfg: 'vehiculo', etiqueta: 'Vehículo', tipo: 'referencia', coleccion: 'vehiculos', mostrar: 'placa', requerido: true, enLista: 'titulo', buscable: true },
-    { clave: 'choferId', cfg: 'chofer', etiqueta: 'Chofer', tipo: 'referencia', coleccion: 'choferes', mostrar: 'nombre', enLista: 'subtitulo', buscable: true },
-    { clave: 'cantidad', cfg: 'cantidad', etiqueta: 'Cantidad', tipo: 'numero', requerido: true, fijo: true, enLista: 'meta', min: 0.1, max: 500, unidad: 'combustible' },
-    { clave: 'monto', cfg: 'monto', etiqueta: 'Monto', tipo: 'dinero', requerido: true, fijo: true, enLista: 'meta', min: 1, max: 1000000 },
+    { clave: 'fecha', cfg: 'fecha_hora', etiqueta: 'Fecha', tipo: 'fecha', requerido: true, fijo: true, grupo: 'cuando' },
+    { clave: 'hora', cfg: 'fecha_hora', etiqueta: 'Hora', tipo: 'hora', grupo: 'cuando' },
+    { clave: 'vehiculoId', cfg: 'vehiculo', etiqueta: 'Vehículo', tipo: 'referencia', coleccion: 'vehiculos', mostrar: 'placa', requerido: true, buscable: true },
+    { clave: 'choferId', cfg: 'chofer', etiqueta: 'Chofer', tipo: 'referencia', coleccion: 'choferes', mostrar: 'nombre', buscable: true },
+    { clave: 'cantidad', cfg: 'cantidad', etiqueta: 'Galones', tipo: 'numero', requerido: true, fijo: true, min: 0.1, max: 500, unidad: 'combustible', grupo: 'carga' },
+    { clave: 'monto', cfg: 'monto', etiqueta: 'Monto', tipo: 'dinero', requerido: true, fijo: true, min: 1, max: 1000000, grupo: 'carga' },
+    { clave: 'tipo', cfg: 'tipo', etiqueta: 'Tipo', tipo: 'seleccion', requerido: true, opciones: CONFIG.combustible.tipos.map((t) => ({ valor: t, etiqueta: t, tono: 'neutro' })), porDefecto: CONFIG.combustible.tipos[0], buscable: true },
+    { clave: 'km', cfg: 'km', etiqueta: 'Kilometraje del vehículo', tipo: 'numero', min: 0, max: 3000000, entero: true, sufijo: 'km', ayuda: 'El que marca el tablero al cargar. Con él se calcula el rendimiento.' },
+    { clave: 'tanqueLleno', etiqueta: 'Tanque lleno', tipo: 'casilla', porDefecto: true, activo: PARAMETROS.campoTanqueLleno, ayuda: 'Márcalo si llenaron el tanque. El rendimiento se calcula entre cargas de tanque lleno.' },
+    { clave: 'estacion', cfg: 'estacion', etiqueta: 'Estación o suplidor', tipo: 'texto', max: 60, buscable: true },
+    { clave: 'fotoId', cfg: 'foto_recibo', etiqueta: 'Foto del recibo', tipo: 'foto', lado: 800 },
   ],
 
   turnos: [
@@ -132,6 +143,7 @@ const ESQUEMAS = {
 
 /** ¿Está encendido el interruptor de este campo en CONFIG? Sin interruptor = siempre activo. */
 function activo(modulo, campo) {
+  if (campo.activo === false) return false;
   if (campo.fijo || !campo.cfg) return true;
   return CONFIG[modulo]?.campos?.[campo.cfg] === true;
 }
