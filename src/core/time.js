@@ -133,6 +133,22 @@ export function estadoViaje(viaje, ahora = new Date(), toleranciaMin = CONFIG.vi
   return { ...calcularEstado(viaje, ahora, toleranciaMin), retrasoSalidaMin: retrasoSalida(viaje) };
 }
 
+/**
+ * Avance del viaje para la pista de la tarjeta: porcentaje y tono.
+ * completado = 100 % (verde a tiempo / rojo retrasado); en ruta = lo transcurrido de la duración programada (entre 8 y 92 %);
+ * sin llegada registrada = 92 % en ámbar; programado = 0 % (ámbar si ya pasó la hora de salida sin registrarla).
+ */
+export function avanceViaje(v, e, ahora = new Date()) {
+  if (e.estado === 'completado') return { pct: 100, tono: e.puntualidad === 'retrasado' ? 'error' : 'ok' };
+  if (e.estado === 'sin_llegada') return { pct: v.salidaReal ? 92 : 0, tono: 'warn' };
+  if (e.estado === 'en_ruta') {
+    const total = Math.max(1, (new Date(v.llegadaProg) - new Date(v.salidaProg)) / 60000);
+    const pasado = (new Date(ahora) - new Date(v.salidaReal)) / 60000;
+    return { pct: Math.round(Math.min(92, Math.max(8, (pasado / total) * 100))), tono: 'curso' };
+  }
+  return { pct: 0, tono: e.salidaAtrasada ? 'warn' : '' };
+}
+
 /** Retraso de SALIDA (dato informativo; el estado se decide por la llegada). null si no ha salido. */
 export function retrasoSalida(viaje) {
   return viaje.salidaReal && viaje.salidaProg ? minutosEntre(viaje.salidaProg, viaje.salidaReal) : null;

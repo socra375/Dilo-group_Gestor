@@ -67,7 +67,7 @@
 
 .fab {
   position: fixed;
-  right: max(var(--gutter), calc((100vw - 720px) / 2 + var(--gutter)));
+  right: max(var(--gutter), calc((100vw - var(--ancho-main)) / 2 + var(--gutter)));
   bottom: calc(76px + env(safe-area-inset-bottom) + var(--sp-3));
   z-index: var(--z-fab);
   min-height: 56px;
@@ -346,6 +346,9 @@
 .item__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .item__actions .btn:first-child { flex: 1 1 auto; }
 .item__actions > * { flex: none; }
+/* Tarjetas cuyas acciones son solo íconos (Llamar, WhatsApp): van a la derecha, en columna, y la tarjeta se acorta ~60 px. */
+.item:has(> .item__actions > .icon-btn) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--sp-2); }
+.item:has(> .item__actions > .icon-btn) > .item__actions { flex-direction: column; flex-wrap: nowrap; gap: 0; }
 .item--archived { opacity: 0.72; }
 .item--warn { border-left: 5px solid var(--c-warn); }
 .item--error { border-left: 5px solid var(--c-error); }
@@ -358,9 +361,39 @@
   font-size: var(--fs-sm);
 }
 .timeline__line {
-  height: 2px;
-  background: repeating-linear-gradient(90deg, var(--c-border-strong) 0 6px, transparent 6px 10px);
+  --tono: var(--c-border-strong);
+  position: relative;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: color-mix(in oklab, var(--c-border-strong) 30%, transparent);
 }
+/* Relleno = avance real del viaje; el punto marca dónde va. El color dice cómo va (a tiempo, en ruta, atrasado, sin llegada). */
+.timeline__line::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--avance, 0%);
+  border-radius: inherit;
+  background: var(--tono);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.timeline__line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: var(--avance, 0%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--tono);
+  box-shadow: 0 0 0 3px var(--c-surface);
+  transform: translate(-50%, -50%);
+  transition: left var(--dur-slow) var(--ease-out);
+}
+.timeline__line--ok { --tono: var(--c-ok); }
+.timeline__line--curso { --tono: var(--c-primary); }
+.timeline__line--warn { --tono: var(--c-warn); }
+.timeline__line--error { --tono: var(--c-error); }
 .timeline strong { font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
 .timeline small { display: block; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 
@@ -403,6 +436,8 @@
 }
 .stat__value--sm { font-size: var(--fs-lg); line-height: 1.25; }
 .stat__note { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.stat__barra { display: block; height: 6px; margin-top: var(--sp-1); border-radius: var(--r-full); background: rgb(255 255 255 / 0.22); overflow: hidden; }
+.stat__barra > span { display: block; height: 100%; width: var(--p, 0%); border-radius: inherit; background: var(--c-accent); transition: width var(--dur-slow) var(--ease-out); }
 .stat--hero { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
 .stat--hero .stat__label,
 .stat--hero .stat__note { color: inherit; opacity: 0.85; }
@@ -622,6 +657,8 @@ dialog::backdrop { background: var(--scrim); }
 .table td { padding: 0.55rem 0.4rem; text-align: right; border-bottom: 1px solid var(--c-border); white-space: nowrap; }
 .table th:first-child,
 .table td:first-child { text-align: left; white-space: normal; }
+/* En Reportes (tablas con desplazamiento propio) el nombre no se aprieta hasta partirse en cuatro líneas. */
+.table-wrap .table td:first-child { min-width: 7.5rem; }
 .table th { font-size: var(--fs-xs); color: var(--c-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .table tfoot td { font-weight: 700; border-bottom: 0; }
 
@@ -737,7 +774,7 @@ dialog::backdrop { background: var(--scrim); }
   /* El contenido ya no necesita espacio para la barra inferior. */
   .app-main { padding-bottom: var(--sp-7); }
   .fab {
-    right: max(var(--gutter), calc((100vw - var(--rail) - 720px) / 2 + var(--gutter)));
+    right: max(var(--gutter), calc((100vw - var(--rail) - var(--ancho-main)) / 2 + var(--gutter)));
     bottom: var(--sp-5);
   }
   .toasts {
@@ -964,3 +1001,25 @@ body.modo-nube .demo-note { display: none !important; }
 .paso__titulo { font-weight: 700; }
 .paso--hecho .paso__titulo { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--c-text-muted); }
 .paso__texto { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+/* ---------- Interacciones (todo lo tocable responde: hover, foco, pulsación) ---------- */
+.item, .aviso, .paso, .stat {
+  transition: box-shadow var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), background-color var(--dur);
+}
+@media (hover: hover) {
+  .item:has(.item__main):hover { box-shadow: var(--shadow-2); border-color: var(--c-border-strong); }
+  .aviso:hover, .paso:hover { box-shadow: var(--shadow-1); transform: translateY(-1px); }
+}
+.item:has(.item__main:active) { transform: scale(0.992); }
+.item:has(.item__main:focus-visible) { border-color: var(--c-focus); } /* la tarjeta entera indica dónde está el foco */
+.aviso:active, .paso:active { transform: scale(0.99); }
+
+/* ---------- Escritorio: rejilla «bento» en Inicio y listas en varias columnas ---------- */
+@media (min-width: 1024px) {
+  .view--bento { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; }
+  .view--bento > * { grid-column: 1 / -1; }
+  .view--bento > .bento-avisos { grid-column: span 7; }
+  .view--bento > .bento-graf { grid-column: span 5; }
+  .view--ancha [data-lista] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); align-items: start; }
+  .view--ancha [data-lista] > li:only-child { grid-column: 1 / -1; } /* estado vacío: ocupa todo el ancho */
+}

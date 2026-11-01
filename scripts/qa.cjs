@@ -295,6 +295,31 @@ let fallos = 0;
       if (accion) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
     }
 
+    // Rejilla de escritorio: Inicio en «bento» (avisos y gráfica lado a lado) y las listas en varias columnas.
+    await ir(page, '#/inicio');
+    await page.waitForSelector('.view--bento .bento-avisos');
+    await page.mouse.move(700, 400);
+    await page.waitForTimeout(350);
+    const bento = await page.evaluate(() => {
+      const r = (q) => document.querySelector(q)?.getBoundingClientRect();
+      const a = r('.bento-avisos'); const g = r('.bento-graf'); const main = r('#main');
+      return { mismaFila: Math.abs(a.top - g.top) < 4 && g.left > a.right - 2, avisosAncho: Math.round(a.width), principal: Math.round(main.width) };
+    });
+    chequear(bento.mismaFila && bento.avisosAncho > bento.principal * 0.5, `Inicio en rejilla: avisos y gráfica lado a lado (${bento.avisosAncho} de ${bento.principal} px)`);
+    const fuera0 = await desbordes(page);
+    const bajos0 = await contraste(page);
+    const a11y0 = await accesibilidad(page);
+    chequear(!fuera0.length && !bajos0.length && !a11y0.length, `Inicio en rejilla: sin desbordes, contraste ni accesibilidad${[...fuera0, ...bajos0, ...a11y0.map((v) => `${v.id} → ${v.ej}`)].map((x) => ` | ${x}`).join('')}`);
+    await page.screenshot({ path: path.join(SALIDA, `${nombreTema}-escritorio-inicio.png`), fullPage: true });
+    await ir(page, '#/viajes');
+    await page.waitForSelector('[data-lista] .item');
+    const cols = await page.evaluate(() => new Set([...document.querySelectorAll('[data-lista] > .item')].map((i) => Math.round(i.getBoundingClientRect().left))).size);
+    chequear(cols >= 2, `Viajes en escritorio usa varias columnas (${cols})`);
+    await ir(page, '#/choferes');
+    await page.waitForSelector('[data-lista] .item');
+    const colsC = await page.evaluate(() => new Set([...document.querySelectorAll('[data-lista] > .item')].map((i) => Math.round(i.getBoundingClientRect().left))).size);
+    chequear(colsC >= 2, `Choferes en escritorio usa varias columnas (${colsC})`);
+
     // Teclado: el foco dentro del riel también lo despliega.
     await page.evaluate(() => { location.hash = '#/inicio'; });
     await page.waitForTimeout(250);

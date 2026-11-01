@@ -10,9 +10,11 @@
   --fs-sm: 0.88rem;
   --fs-base: 1rem;
   --fs-lg: 1.15rem;
-  --fs-xl: 1.4rem;
-  --fs-2xl: 1.75rem;
-  --fs-3xl: 2.15rem;
+  /* Tipografía fluida: el mínimo es el tamaño de siempre en el teléfono (con la letra normal/grande/extra de Ajustes,
+     porque rem sigue a esa preferencia) y crece en pantallas anchas. */
+  --fs-xl: clamp(1.4rem, 1.3rem + 0.45vw, 1.65rem);
+  --fs-2xl: clamp(1.75rem, 1.5rem + 0.9vw, 2.2rem);
+  --fs-3xl: clamp(2.15rem, 1.7rem + 1.8vw, 3rem);
   --lh-tight: 1.2;
   --lh-base: 1.5;
 
@@ -82,8 +84,9 @@
   --c-neutral: #4b5a69;
   --c-neutral-bg: #e9edf2;
 
-  --shadow-1: 0 1px 2px rgb(16 27 38 / 0.06), 0 1px 3px rgb(16 27 38 / 0.08);
-  --shadow-2: 0 4px 12px rgb(16 27 38 / 0.10), 0 2px 4px rgb(16 27 38 / 0.06);
+  /* Sombras con el azul de la marca (no negro puro): se sienten parte del diseño y no «pesadas». */
+  --shadow-1: 0 1px 2px color-mix(in oklab, var(--brand) 12%, transparent), 0 2px 8px color-mix(in oklab, var(--brand) 6%, transparent);
+  --shadow-2: 0 6px 18px color-mix(in oklab, var(--brand) 16%, transparent), 0 2px 4px color-mix(in oklab, var(--brand) 9%, transparent);
   --shadow-3: 0 -8px 32px rgb(16 27 38 / 0.18);
   --scrim: rgb(10 16 22 / 0.48);
 }
@@ -161,3 +164,7 @@
     --scrim: rgb(0 0 0 / 0.6);
   }
 }
+
+/* Ancho del contenido: columna de teléfono, y en pantallas anchas una rejilla (ver .view--ancha y .view--bento). */
+:root { --ancho-main: 720px; }
+@media (min-width: 1024px) { :root { --ancho-main: 1120px; } }

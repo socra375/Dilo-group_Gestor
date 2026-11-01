@@ -186,3 +186,34 @@ test('generar viajes: no duplica los que ya existen (y sí recrea si el existent
 test('generar viajes: rutas archivadas o sin horarios no generan nada', () => {
   assert.equal(viajesDesdeHorarios([RUTAS[2], RUTAS[3]], [], '2026-03-10').length, 0);
 });
+
+// ---------- Avance del viaje (pista de la tarjeta) ----------
+import { avanceViaje } from '../src/core/time.js';
+
+const viajeAvance = (extra = {}) => ({ salidaProg: '2026-03-02T10:00:00.000Z', llegadaProg: '2026-03-02T11:00:00.000Z', ...extra });
+const estadoAvance = (extra = {}) => ({ estado: 'programado', puntualidad: null, salidaAtrasada: false, ...extra });
+
+test('avance: programado = 0 % neutro; si ya pasó la hora de salida sin registrarla, ámbar', () => {
+  assert.deepEqual(avanceViaje(viajeAvance(), estadoAvance()), { pct: 0, tono: '' });
+  assert.deepEqual(avanceViaje(viajeAvance(), estadoAvance({ estado: 'sin_llegada', salidaAtrasada: true })), { pct: 0, tono: 'warn' });
+});
+
+test('avance: en ruta = tiempo transcurrido de la duración programada, entre 8 y 92 %', () => {
+  const v = viajeAvance({ salidaReal: '2026-03-02T10:00:00.000Z' });
+  const e = estadoAvance({ estado: 'en_ruta' });
+  assert.deepEqual(avanceViaje(v, e, new Date('2026-03-02T10:30:00.000Z')), { pct: 50, tono: 'curso' });
+  assert.equal(avanceViaje(v, e, new Date('2026-03-02T10:00:10.000Z')).pct, 8, 'recién salió: no queda en 0');
+  assert.equal(avanceViaje(v, e, new Date('2026-03-02T13:00:00.000Z')).pct, 92, 'nunca llega a 100 sin registrar la llegada');
+});
+
+test('avance: sin llegada registrada = 92 % ámbar; completado = 100 % (verde a tiempo, rojo retrasado)', () => {
+  const v = viajeAvance({ salidaReal: '2026-03-02T10:02:00.000Z' });
+  assert.deepEqual(avanceViaje(v, estadoAvance({ estado: 'sin_llegada' })), { pct: 92, tono: 'warn' });
+  assert.deepEqual(avanceViaje(v, estadoAvance({ estado: 'completado', puntualidad: 'a_tiempo' })), { pct: 100, tono: 'ok' });
+  assert.deepEqual(avanceViaje(v, estadoAvance({ estado: 'completado', puntualidad: 'retrasado' })), { pct: 100, tono: 'error' });
+});
+
+test('avance: un viaje que cruza la medianoche usa su duración real', () => {
+  const v = { salidaProg: '2026-03-02T23:40:00.000Z', llegadaProg: '2026-03-03T00:20:00.000Z', salidaReal: '2026-03-02T23:40:00.000Z' };
+  assert.equal(avanceViaje(v, estadoAvance({ estado: 'en_ruta' }), new Date('2026-03-03T00:00:00.000Z')).pct, 50);
+});

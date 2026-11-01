@@ -143,7 +143,7 @@ textarea {
 
 .app-main {
   padding: var(--sp-4) var(--gutter) calc(96px + 4rem + env(safe-area-inset-bottom));
-  max-width: 720px;
+  max-width: var(--ancho-main);
   margin: 0 auto;
 }
 
@@ -166,6 +166,12 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr); /* ningún hijo puede ensanchar la página */
   gap: var(--sp-4);
+}
+/* En pantallas anchas, las pantallas de lectura (Ajustes, Reportes, Más) conservan una columna cómoda y centrada;
+   las de listas y Inicio usan todo el ancho (.view--ancha). */
+@media (min-width: 1024px) {
+  .view { max-width: 760px; margin-inline: auto; }
+  .view--ancha, .view--bento { max-width: none; }
 }
 
 .section {

@@ -125,6 +125,7 @@ export default {
   pestana: 'mas',
   async render(el, params = {}) {
     const est = { fecha: params.fecha || hoyClave() };
+    el.classList.add('view--ancha');
     el.innerHTML = `
       <div class="row" role="group" aria-label="Día">
         <button type="button" class="icon-btn" data-dia="-1" aria-label="Día anterior" style="transform:scaleX(-1)">${icon('chevron')}</button>

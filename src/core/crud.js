@@ -97,6 +97,7 @@ export function pantallaCrud(op) {
     pestana: op.pestana,
     async render(el, params = {}) {
       const estado = { q: params.q || '', archivados: params.archivados === '1' };
+      el.classList.add('view--ancha');
       el.innerHTML = `
         ${op.cabeceraFija || ''}
         <div class="search">${icon('search')}<label class="sr-only" for="buscar">Buscar</label>

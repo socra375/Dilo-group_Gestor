@@ -6,8 +6,7 @@ import { camposDe } from '../core/esquemas.js';
 import { tolerancia } from '../core/prefs.js';
 import {
   aISO, fechaClave, horaClave, hoyClave, sumarDias, horaDespues, horaCercana,
-  estadoViaje, sumarMinutos, minutosEntre, formatoDuracion, viajesDesdeHorarios,
-} from '../core/time.js';
+  estadoViaje, sumarMinutos, minutosEntre, formatoDuracion, viajesDesdeHorarios, avanceViaje } from '../core/time.js';
 import * as fmt from '../core/format.js';
 import { abrirFormulario } from '../core/form.js';
 import { cargarRefs, porId, normalizar } from '../core/crud.js';
@@ -47,6 +46,7 @@ export function tarjetaViaje(v, refs, ahora = new Date()) {
   } else if (!v.archivado && v.salidaReal && !v.llegadaReal) {
     accion = `<button type="button" class="btn btn--primary" data-registrar="llegada" data-id="${esc(v.id)}">${icon('flag')}Registrar llegada</button>`;
   }
+  const avance = avanceViaje(v, e, ahora);
   const clase = e.puntualidad === 'retrasado' ? 'item--error' : e.estado === 'sin_llegada' || e.salidaAtrasada ? 'item--warn' : '';
   const sinAsignar = (texto) => `<span class="chip chip--aviso chip--plain">${texto}</span>`;
   return `<li class="item ${clase} ${v.archivado ? 'item--archived' : ''}">
@@ -56,7 +56,7 @@ export function tarjetaViaje(v, refs, ahora = new Date()) {
         <span class="row row--wrap">${v.archivado ? '<span class="chip chip--neutro">Archivado</span>' : chipsEstado(e)}</span>
         <span class="timeline" style="margin-top:var(--sp-2)">
           <span><strong>${fmt.hora(v.salidaProg)}</strong><small>${v.salidaReal ? `Salió ${fmt.hora(v.salidaReal)} (${conSigno(e.retrasoSalidaMin)})` : 'Salida'}</small></span>
-          <span class="timeline__line" aria-hidden="true"></span>
+          <span class="timeline__line ${avance.tono ? `timeline__line--${avance.tono}` : ''}" style="--avance:${avance.pct}%" aria-hidden="true"></span>
           <span style="text-align:right"><strong>${fmt.hora(v.llegadaProg)}</strong><small>${v.llegadaReal ? `Llegó ${fmt.hora(v.llegadaReal)}` : cruza ? 'Llegada (día sig.)' : 'Llegada'}</small></span>
         </span>
         <span class="item__meta">
@@ -256,6 +256,7 @@ export default {
   pestana: 'viajes',
   async render(el, params = {}) {
     const est = { fecha: params.fecha || hoyClave(), filtro: params.filtro || 'todos', q: '' };
+    el.classList.add('view--ancha');
     el.innerHTML = `
       <div class="row" role="group" aria-label="Día">
         <button type="button" class="icon-btn" data-dia="-1" aria-label="Día anterior" style="transform:scaleX(-1)">${icon('chevron')}</button>

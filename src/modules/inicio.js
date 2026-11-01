@@ -29,7 +29,7 @@ function calcular({ viajes, combustible, choferes, refs }) {
   const galones = cargasHoy.reduce((s, c) => s + (Number(c.cantidad) || 0), 0);
 
   const totales = {
-    viajes: { valor: deHoy.length, nota: fmt.plural(estados.filter((e) => e.estado === 'completado').length, 'completado', 'completados') },
+    viajes: { valor: deHoy.length, nota: fmt.plural(estados.filter((e) => e.estado === 'completado').length, 'completado', 'completados'), progreso: deHoy.length ? estados.filter((e) => e.estado === 'completado').length / deHoy.length : 0 },
     retrasos: { valor: estados.filter((e) => e.puntualidad === 'retrasado').length, nota: `de ${fmt.plural(estados.filter((e) => e.estado === 'completado').length, 'llegado', 'llegados')}` },
     combustible: { valor: Math.round(galones * 10) / 10, decimales: 1, nota: `${fmt.dinero(cargasHoy.reduce((s, c) => s + (Number(c.monto) || 0), 0))} · ${fmt.plural(cargasHoy.length, 'carga', 'cargas')}` },
     // SUPUESTO: "activo" = no archivado (el cuestionario no pide un estado para los choferes).
@@ -64,14 +64,14 @@ function tarjetas(t) {
     .map((d) => `<div class="stat ${d.clase || ''}">
         <span class="stat__label">${esc(d.etiqueta)}</span>
         <span class="stat__value tabular" data-contador="${d.id}">${fmt.numero(t[d.id].valor, t[d.id].decimales || 0)}</span>
-        <span class="stat__note">${d.unidad ? `${esc(d.unidad)} · ` : ''}${esc(t[d.id].nota)}</span></div>`)
+        <span class="stat__note">${d.unidad ? `${esc(d.unidad)} · ` : ''}${esc(t[d.id].nota)}</span>${d.id === 'viajes' && t.viajes.valor > 0 ? `<span class="stat__barra" aria-hidden="true"><span style="--p:${Math.round(t.viajes.progreso * 100)}%"></span></span>` : ''}</div>`)
     .join('')}</div></section>`;
 }
 
 function bloqueAvisos(avisos) {
   const urgentes = avisos.filter((a) => a.severidad === 'urgente').length;
   const visibles = avisos.slice(0, PARAMETROS.avisosEnInicio);
-  return `<section class="card section" aria-labelledby="t-avisos">
+  return `<section class="card section bento-avisos" aria-labelledby="t-avisos">
     <div class="section__head"><h2 class="section__title" id="t-avisos">Avisos</h2>
       ${avisos.length ? `<span class="muted">${urgentes ? `${urgentes} urgente${urgentes === 1 ? '' : 's'} · ` : ''}${avisos.length} en total</span>` : ''}</div>
     ${avisos.length
@@ -116,6 +116,7 @@ export default {
   // Encabezado de Inicio: la empresa como título y la fecha de hoy arriba.
   supratitulo: () => cap(fmt.fechaLarga(hoyClave())),
   async render(el) {
+    el.classList.add('view--ancha');
     el.innerHTML = '<div data-cuerpo></div>';
     const cuerpo = el.querySelector('[data-cuerpo]');
     let ultimos = { viajes: [], refs: null, avisos: [] };
@@ -129,11 +130,11 @@ export default {
       const d = calcular({ viajes, combustible, choferes, refs });
       ultimos = { viajes, refs, avisos: d.avisos };
 
-      cuerpo.innerHTML = `<div class="view">
+      cuerpo.innerHTML = `<div class="view view--bento">
         ${bloquePasos(pasosIniciales({ vehiculos: refs.listas.vehiculos, choferes, rutas: refs.listas.rutas, viajes }))}
         ${tarjetas(d.totales)}
         ${bloqueAvisos(d.avisos)}
-        <section class="card section" aria-label="Retrasos por día">${graficaRetrasosHTML(d.retrasosDia, { titulo: 'Retrasos por día', id: 'retrasos-dia' })}</section>
+        <section class="card section bento-graf" aria-label="Retrasos por día">${graficaRetrasosHTML(d.retrasosDia, { titulo: 'Retrasos por día', id: 'retrasos-dia' })}</section>
         <section class="section" aria-labelledby="t-hoy">
           <div class="section__head"><h2 class="section__title" id="t-hoy">Viajes de hoy</h2><a href="#/viajes">Ver todos</a></div>
           ${d.deHoy.length
