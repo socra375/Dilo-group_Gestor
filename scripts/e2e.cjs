@@ -11,7 +11,7 @@ const ok = (cond, msg) => {
 // Reintenta una condición hasta `ms`: la lista se repinta de forma asíncrona tras guardar.
 // Navega y espera a que el router muestre la pantalla NUEVA (título incluido): si no, la prueba puede
 // leer la lista de la pantalla anterior, que sigue visible un instante.
-const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', inicio: 'Dilo group' };
+const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', asistencia: 'Asistencia', inicio: 'Dilo group' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = `#/${h}`; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
@@ -125,22 +125,78 @@ async function espera(cond, ms = 4000) {
   ok(registrado.motivoRetraso === 'Goma pinchada en la autopista' && registrado.llegadaReal, 'llegada tarde guardada con su motivo');
   await page.click('[data-dia="-1"]'); // volver a hoy
 
-  // Turnos: marcar entrada y salida.
-  await ir(page, 'choferes');
+  // ---- Fase 7: asistencia del chofer (marcar entrada y salida con hora editable) ----
+  await page.evaluate(() => { location.hash = '#/mas'; });
+  await page.waitForSelector('.menu');
+  ok((await page.locator('.menu a', { hasText: 'Asistencia' }).count()) === 1, '"Asistencia" aparece en el menú Más (CONFIG.modulos.asistencia)');
+  // Estado inicial explícito: los datos de ejemplo traen entradas desde las 5:00 a. m., así que sin esto
+  // el resultado dependería de la hora a la que corre la prueba.
+  await page.evaluate(async () => {
+    const st = await import('/src/data/store.js');
+    const pedro = (await st.list('choferes')).find((c) => c.nombre.startsWith('Pedro José'));
+    for (const r of await st.list('asistencia')) if (r.choferId === pedro.id) await st.remove('asistencia', r.id);
+  });
+  await ir(page, 'asistencia');
   await page.waitForSelector('[data-lista] .item');
-  const card = page.locator('.item', { hasText: 'Luis Manuel' });
-  await card.locator('[data-accion="entrada"]').click();
-  ok(await espera(async () => (await card.textContent()).includes('En turno desde')), 'marcar entrada abre el turno');
-  await card.locator('[data-accion="salida"]').click();
-  ok(await espera(async () => (await card.locator('[data-accion="entrada"]').count()) === 1), 'marcar salida cierra el turno');
+  const hoyClaveE2E = await page.evaluate(async () => (await import('/src/core/time.js')).hoyClave());
+  const fila = page.locator('[data-lista] .item', { hasText: 'Pedro José Almonte' });
+  ok((await page.locator('[data-lista] > li').count()) === 5, 'la lista del día muestra a los 5 choferes');
+  ok((await fila.textContent()).includes('Sin registro'), 'un chofer sin entrada hoy figura "Sin registro"');
+  await fila.locator('[data-marcar="entrada"]').click();
+  await page.waitForSelector('dialog.sheet form #f-entrada');
+  ok(/^\d{2}:\d{2}$/.test(await page.inputValue('#f-entrada')), 'hoy la hora de entrada viene propuesta (se puede cambiar)');
+  await page.fill('#f-entrada', '08:15');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  ok(await espera(async () => (await fila.textContent()).includes('Entró 8:15 a. m. · en turno')), 'marcar entrada con la hora escrita a mano');
+  ok((await fila.textContent()).includes('En turno'), 'y el chofer queda "En turno"');
+  // No se puede marcar otra entrada con una abierta; la salida se marca desde el mismo botón.
+  ok((await fila.locator('[data-marcar="entrada"]').count()) === 0 && (await fila.locator('[data-marcar="salida"]').count()) === 1, 'con el turno abierto solo se ofrece "Marcar salida"');
+  await fila.locator('[data-marcar="salida"]').click();
+  await page.waitForSelector('dialog.sheet form #f-salida');
+  await page.fill('#f-salida', '08:15');
+  await page.click('dialog.sheet button[type=submit]');
+  ok((await page.textContent('#f-salida-err')).includes('distinta'), 'la salida igual a la entrada se rechaza junto al campo');
+  await page.fill('#f-salida', '17:40');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  ok(await espera(async () => (await fila.textContent()).includes('Salió 5:40 p. m. · 9 h 25 min') && (await fila.textContent()).includes('Completo')), 'marcar salida: 9 h 25 min de turno');
 
-  // Corregir un turno nocturno (22:00 → 06:00 al día siguiente).
-  await card.locator('[data-accion="turnos"]').click();
+  // Corregir/agregar un registro desde el historial: turno nocturno 22:00 → 06:00 (cruza la medianoche).
+  await fila.locator('[data-historial]').click();
+  await page.waitForSelector('dialog.sheet [data-agregar]');
   await page.click('[data-agregar]');
+  await page.waitForSelector('dialog.sheet form #f-entrada');
+  await page.fill('#f-fecha', await page.evaluate(async () => (await import('/src/core/time.js')).sumarDias((await import('/src/core/time.js')).hoyClave(), -3)));
   await page.fill('#f-entrada', '22:00');
   await page.fill('#f-salida', '06:00');
-  await page.locator('dialog.sheet button[type=submit]').last().click();
-  ok(await espera(async () => (await page.locator('dialog.sheet', { hasText: '(día sig.)' }).count()) === 1), 'turno nocturno de 8 h cruza la medianoche');
+  await page.locator('dialog.sheet form button[type=submit], dialog.sheet button[type=submit]').last().click();
+  ok(await espera(async () => (await page.locator('dialog.sheet[open] [data-historial]', { hasText: '(día sig.)' }).count()) >= 0 && (await page.textContent('dialog.sheet[open]')).includes('Salió 6:00 a. m. (día sig.) · 8 h')), 'turno nocturno de 8 h cruza la medianoche');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+
+  // Un turno nocturno abierto ayer sigue "En turno" hoy y se cierra con la salida del día siguiente.
+  await page.evaluate(async () => {
+    const st = await import('/src/data/store.js'); const t = await import('/src/core/time.js');
+    const chofer = (await st.list('choferes')).find((c) => c.nombre.startsWith('Luis Manuel'));
+    const ayer = t.sumarDias(t.hoyClave(), -1);
+    // Se cierran los de ejemplo de este chofer para que el único abierto sea el nocturno de la prueba.
+    for (const r of (await st.list('asistencia')).filter((x) => x.choferId === chofer.id && !x.salida)) await st.update('asistencia', r.id, { salida: t.sumarMinutos(r.entrada, 480) });
+    await st.create('asistencia', { choferId: chofer.id, fecha: ayer, entrada: t.aISO(ayer, '22:00'), salida: null });
+  });
+  await ir(page, 'inicio');
+  await ir(page, 'asistencia');
+  await page.waitForSelector('[data-lista] .item');
+  const nocturno = page.locator('[data-lista] .item', { hasText: 'Luis Manuel' });
+  ok(await espera(async () => (await nocturno.textContent()).includes('Desde ayer · Entró 10:00 p. m.')), 'el turno que empezó ayer y sigue abierto aparece hoy como "Desde ayer"');
+  await nocturno.locator('[data-marcar="salida"]').click();
+  await page.waitForSelector('dialog.sheet form #f-salida');
+  await page.fill('#f-salida', '06:10');
+  await page.click('dialog.sheet button[type=submit]');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  const cerrado = (await leer(page, 'asistencia')).find((r) => r.fecha !== hoyClaveE2E && r.entrada.includes('T02:00:00') && r.salida);
+  ok(cerrado && cerrado.salida > cerrado.entrada, 'la salida de madrugada se guarda al día siguiente de la entrada');
 
   // Archivar y restaurar un vehículo, con confirmación dentro de la página.
   await page.keyboard.press('Escape');
@@ -460,6 +516,61 @@ async function espera(cond, ms = 4000) {
   ok(toasts.tocable, 'los toasts no se tragan los toques');
 
   ok(!errores.length, `sin errores de consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
+  // Actualización de la base v1 → v2: lo que había en 'turnos' pasa a 'asistencia' sin perderse.
+  {
+    const ctx4 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const p4 = await ctx4.newPage();
+    const origen = new URL(base).origin;
+    await p4.goto(`${origen}/manifest.webmanifest`); // mismo origen, sin código de la app: así se crea la base vieja primero
+    await p4.evaluate(async () => {
+      await new Promise((ok, mal) => {
+        const pet = indexedDB.open('dilo-transporte', 1);
+        pet.onupgradeneeded = () => {
+          const db = pet.result;
+          for (const n of ['choferes', 'rutas', 'vehiculos', 'viajes', 'combustible', 'turnos', 'fotos']) db.createObjectStore(n, { keyPath: 'id' });
+        };
+        pet.onsuccess = () => {
+          const db = pet.result;
+          const t = db.transaction(['choferes', 'turnos'], 'readwrite');
+          t.objectStore('choferes').put({ id: 'c1', nombre: 'Chofer de la base vieja', archivado: false });
+          t.objectStore('turnos').put({ id: 't1', choferId: 'c1', fecha: '2026-10-01', entrada: '2026-10-01T09:00:00.000Z', salida: '2026-10-01T17:00:00.000Z' });
+          t.oncomplete = () => { db.close(); ok(); };
+          t.onerror = () => mal(t.error);
+        };
+        pet.onerror = () => mal(pet.error);
+      });
+      localStorage.setItem('ct:prefs', JSON.stringify({ sembrado: true }));
+    });
+    await p4.goto(`${base}#/asistencia`);
+    await p4.waitForSelector('[data-lista] .item');
+    const migrado = await p4.evaluate(async () => {
+      const st = await import('/src/data/store.js');
+      const nombres = await new Promise((ok) => { const r = indexedDB.open('dilo-transporte'); r.onsuccess = () => { const n = [...r.result.objectStoreNames]; r.result.close(); ok(n); }; });
+      return { asistencia: (await st.list('asistencia')).map((x) => x.id), chofer: (await st.list('choferes')).map((c) => c.nombre), almacenes: nombres };
+    });
+    ok(JSON.stringify(migrado.asistencia) === '["t1"]' && migrado.chofer[0] === 'Chofer de la base vieja', 'al actualizar la base, los turnos pasan a asistencia sin perderse');
+    ok(!migrado.almacenes.includes('turnos') && migrado.almacenes.includes('asistencia'), 'y el almacén viejo "turnos" desaparece');
+    await ctx4.close();
+  }
+
+  // El módulo se oculta con CONFIG.modulos.asistencia = false (menú y ruta).
+  {
+    const ctx5 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    await ctx5.route('**/src/config.js', async (route) => {
+      const resp = await route.fetch();
+      await route.fulfill({ response: resp, body: (await resp.text()).replace('asistencia: true', 'asistencia: false') });
+    });
+    await ctx5.addInitScript(() => localStorage.setItem('ct:prefs', JSON.stringify({ sembrado: true })));
+    const p5 = await ctx5.newPage();
+    await p5.goto(`${base}#/mas`);
+    await p5.waitForSelector('.menu');
+    ok((await p5.locator('.menu a', { hasText: 'Asistencia' }).count()) === 0, 'con asistencia en false desaparece del menú');
+    await p5.evaluate(() => { location.hash = '#/asistencia'; });
+    await p5.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Dilo group');
+    ok(true, 'y su dirección lleva a Inicio');
+    await ctx5.close();
+  }
+
   // Inicio sin datos: todo en cero y estado vacío positivo (no depende de la hora del día).
   {
     const ctx3 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', timezoneId: 'America/Santo_Domingo' });

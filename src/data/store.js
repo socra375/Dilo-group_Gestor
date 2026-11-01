@@ -3,10 +3,10 @@
 // Implementación actual: IndexedDB (admite fotos). Para migrar a Supabase se reescribe SOLO este archivo (ver README).
 // Ningún otro archivo toca IndexedDB.
 
-export const COLECCIONES = ['choferes', 'rutas', 'vehiculos', 'viajes', 'combustible', 'turnos'];
+export const COLECCIONES = ['choferes', 'rutas', 'vehiculos', 'viajes', 'combustible', 'asistencia'];
 const FOTOS = 'fotos';
 const BD = 'dilo-transporte';
-const VERSION_BD = 1;
+const VERSION_BD = 2; // 2: la colección 'turnos' pasa a llamarse 'asistencia'
 
 let conexion = null;
 
@@ -15,10 +15,20 @@ function abrir() {
     conexion = new Promise((resolver, rechazar) => {
       if (!globalThis.indexedDB) return rechazar(new Error('Este navegador no permite guardar datos (IndexedDB no disponible).'));
       const pet = indexedDB.open(BD, VERSION_BD);
-      pet.onupgradeneeded = () => {
+      pet.onupgradeneeded = (e) => {
         const db = pet.result;
         for (const nombre of [...COLECCIONES, FOTOS]) {
           if (!db.objectStoreNames.contains(nombre)) db.createObjectStore(nombre, { keyPath: 'id' });
+        }
+        // v1 → v2: lo que estaba en 'turnos' se copia a 'asistencia' dentro de esta misma transacción
+        // (si algo falla, la actualización completa se deshace y no se pierde nada).
+        if (e.oldVersion >= 1 && e.oldVersion < 2 && db.objectStoreNames.contains('turnos')) {
+          const viejo = pet.transaction.objectStore('turnos');
+          const nuevo = pet.transaction.objectStore('asistencia');
+          viejo.getAll().onsuccess = (ev) => {
+            for (const registro of ev.target.result) nuevo.put(registro);
+            db.deleteObjectStore('turnos');
+          };
         }
       };
       pet.onsuccess = () => {
@@ -207,7 +217,9 @@ export async function listarFotos() {
  */
 export async function migrarDesdeLocalStorage() {
   if (typeof localStorage === 'undefined') return 0;
-  const viejas = COLECCIONES.map((c) => [c, localStorage.getItem(`ct:v1:${c}`)]).filter(([, v]) => v);
+  const LEGADO = { turnos: 'asistencia' }; // nombre viejo → nombre actual
+  const claves = [...COLECCIONES.map((c) => [c, c]), ...Object.entries(LEGADO).map(([viejo, nuevo]) => [viejo, nuevo])];
+  const viejas = claves.map(([clave, col]) => [col, localStorage.getItem(`ct:v1:${clave}`), clave]).filter(([, v]) => v);
   if (!viejas.length) return 0;
   const actuales = await exportAll();
   let copiados = 0;
@@ -221,7 +233,7 @@ export async function migrarDesdeLocalStorage() {
       }
     }
   }
-  for (const [c] of viejas) localStorage.removeItem(`ct:v1:${c}`);
+  for (const [, , clave] of viejas) localStorage.removeItem(`ct:v1:${clave}`);
   return copiados;
 }
 

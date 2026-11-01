@@ -150,7 +150,7 @@ export async function sembrar(ahora = new Date()) {
     if (veh.mantenimientoKm === null) veh.mantenimientoKm = km + 350;
   });
 
-  const turnos = [];
+  const asistencia = [];
   for (let d = -13; d <= 0; d++) {
     const dia = sumarDias(hoy, d);
     choferes.forEach((c, i) => {
@@ -158,8 +158,8 @@ export async function sembrar(ahora = new Date()) {
       const entrada = aISO(dia, i === 3 ? '12:45' : '05:00');
       const salida = sumarMinutos(entrada, 9 * 60 + entre(-20, 40));
       if (new Date(entrada).getTime() > ahoraT) return;
-      turnos.push({
-        ...ej, id: `ej-turno-${dia}-${i}`, choferId: c.id, fecha: dia,
+      asistencia.push({
+        ...ej, id: `ej-asistencia-${dia}-${i}`, choferId: c.id, fecha: dia,
         entrada: sumarMinutos(entrada, entre(-10, 10)),
         salida: new Date(salida).getTime() <= ahoraT ? salida : null,
       });
@@ -171,7 +171,7 @@ export async function sembrar(ahora = new Date()) {
   await store.createMany('rutas', rutas);
   await store.createMany('viajes', viajes);
   await store.createMany('combustible', combustible);
-  await store.createMany('turnos', turnos);
+  await store.createMany('asistencia', asistencia);
 }
 
 export async function hayDatosEjemplo() {
@@ -188,7 +188,7 @@ export async function referenciasReales() {
     for (const x of await store.list(c, { archivados: 'todos' })) if (x.ejemplo) ids.add(x.id);
   }
   let n = 0;
-  for (const c of ['viajes', 'combustible', 'turnos', 'choferes']) {
+  for (const c of ['viajes', 'combustible', 'asistencia', 'choferes']) {
     for (const x of await store.list(c, { archivados: 'todos' })) {
       if (!x.ejemplo && [x.rutaId, x.choferId, x.vehiculoId].some((id) => ids.has(id))) n++;
     }

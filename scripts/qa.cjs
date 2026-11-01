@@ -18,6 +18,7 @@ const PANTALLAS = [
   ['rutas', '#/rutas'],
   ['vehiculos', '#/vehiculos'],
   ['combustible', '#/combustible'],
+  ['asistencia', '#/asistencia'],
   ['reportes', '#/reportes'],
   ['ajustes', '#/ajustes'],
   ['mas', '#/mas'],
@@ -91,8 +92,25 @@ async function contraste(page) {
   });
 }
 
+// Accesibilidad con axe-core (solo para pruebas; la app no tiene dependencias). Si no está instalado
+// (`npm i --no-save axe-core`), se avisa y se omite: en CI siempre se instala.
+let AXE = null;
+try { AXE = require('fs').readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8'); } catch { /* sin axe */ }
+
+/** Violaciones WCAG 2.1 A/AA en lo que hay en pantalla (incluye hojas y diálogos abiertos). */
+async function accesibilidad(page) {
+  if (!AXE) return [];
+  await page.evaluate(AXE);
+  const r = await page.evaluate(async () => (await window.axe.run(document, {
+    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
+    // El contraste ya lo mide `contraste()` con la superficie real; axe no resuelve color-mix().
+    rules: { 'color-contrast': { enabled: false } },
+  })).violations.map((v) => ({ id: v.id, impacto: v.impact, ayuda: v.help, n: v.nodes.length, ej: v.nodes[0].target.join(' ').slice(0, 90) })));
+  return r;
+}
+
 // Espera a que el router muestre la pantalla pedida (si no, se revisaría la anterior y daría un falso verde).
-const TITULOS = { '#/inicio': 'Dilo group', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/mas': 'Más' };
+const TITULOS = { '#/inicio': 'Dilo group', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/asistencia': 'Asistencia', '#/mas': 'Más' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = h; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
@@ -149,6 +167,11 @@ async function verificarTema(page, tema) {
       await page.waitForTimeout(250);
       const fuera = await desbordes(page);
       const bajos = await contraste(page);
+      const a11y = await accesibilidad(page);
+      if (a11y.length) {
+        fallos++;
+        console.log(`✗ ${tema} ${nombre}: accesibilidad\n   ${a11y.map((v) => `${v.id} (${v.impacto}, ${v.n}): ${v.ayuda} → ${v.ej}`).join('\n   ')}`);
+      }
       if (bajos.length) {
         fallos++;
         console.log(`✗ ${tema} ${nombre}: contraste insuficiente\n   ${bajos.join('\n   ')}`);
@@ -241,6 +264,8 @@ async function verificarTema(page, tema) {
     chequear(abierto.ancho === 248, `con el mouse encima se despliega (${abierto.ancho} px)`);
     chequear(abierto.opacidad === 1 && abierto.etiquetaVisible, 'se ven los nombres de las secciones');
     chequear(abierto.mainIzq === reposo.mainIzq, 'el contenido no se desplaza al desplegar');
+    const a11yRiel = await accesibilidad(page);
+    chequear(!a11yRiel.length, `accesibilidad del riel desplegado${a11yRiel.length ? `: ${a11yRiel.map((v) => `${v.id} → ${v.ej}`).join(' | ')}` : ''}`);
     const bajosAbierto = await contraste(page);
     chequear(!bajosAbierto.length, `contraste del riel desplegado${bajosAbierto.length ? `: ${bajosAbierto.join(' | ')}` : ''}`);
     await page.screenshot({ path: path.join(SALIDA, `${nombreTema}-escritorio-riel-abierto.png`) });
@@ -257,6 +282,8 @@ async function verificarTema(page, tema) {
       if (accion) { try { await accion(page); } catch { /* el formulario ya se cubre a 390 px */ continue; } }
       const fuera = await desbordes(page);
       const bajos = await contraste(page);
+      const a11yEsc = await accesibilidad(page);
+      chequear(!a11yEsc.length, `${nombre}: accesibilidad${a11yEsc.length ? ` ${a11yEsc.map((v) => `${v.id} → ${v.ej}`).join(' | ')}` : ''}`);
       chequear(!fuera.length && !bajos.length, `${nombre}${fuera.length ? ` desborde: ${fuera.join(', ')}` : ''}${bajos.length ? ` contraste: ${bajos.join(' | ')}` : ''}`);
       if (nombre === 'viajes') await page.screenshot({ path: path.join(SALIDA, `${nombreTema}-escritorio-viajes.png`) });
       if (accion) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
@@ -288,6 +315,26 @@ async function verificarTema(page, tema) {
     await ctx.close();
   }
 
+  // Movimiento: con "reducir movimiento" todo queda sin animación; sin esa preferencia, las animaciones existen.
+  for (const reducir of [true, false]) {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: reducir ? 'reduce' : 'no-preference' });
+    await ctx.addInitScript(() => localStorage.setItem('ct:prefs', JSON.stringify({ sembrado: true })));
+    const page = await ctx.newPage();
+    await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
+    await page.waitForSelector('.graf svg');
+    await page.evaluate(() => { location.hash = '#/viajes'; });
+    await page.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Viajes');
+    const m = await page.evaluate(() => {
+      const seg = (el) => parseFloat(getComputedStyle(el).animationDuration) * (getComputedStyle(el).animationDuration.endsWith('ms') ? 0.001 : 1);
+      const vista = document.querySelector('.view');
+      return { vista: seg(vista), nombre: getComputedStyle(vista).animationName };
+    });
+    const ok = reducir ? m.vista <= 0.002 : m.vista >= 0.15 && m.vista <= 0.25 && m.nombre.includes('view-in');
+    console.log(`${ok ? '✓' : '✗'} movimiento ${reducir ? 'reducido: sin animación' : 'normal: cambio de pantalla de 160–200 ms'} (${m.nombre}, ${(m.vista * 1000).toFixed(0)} ms)`);
+    if (!ok) fallos++;
+    await ctx.close();
+  }
+
   // PWA: el service worker precarga la app y abre sin conexión.
   {
     const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
@@ -305,6 +352,7 @@ async function verificarTema(page, tema) {
     await ctx.close();
   }
 
+  if (!AXE) console.log('· axe-core no está instalado: se omitió la revisión de accesibilidad (npm i --no-save axe-core)');
   await navegador.close();
   servidor.close();
   console.log(fallos ? `\n${fallos} problema(s).` : '\nQA sin problemas.');

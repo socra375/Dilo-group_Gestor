@@ -42,6 +42,10 @@ async function importarRespaldo(archivo) {
   }
   if (r?.app !== 'control-transporte' || !r.datos) throw new Error('Este archivo no es un respaldo de Control de Transporte.');
   if (r.formato > FORMATO) throw new Error('El respaldo es de una versión más nueva de la app. Actualiza la app primero.');
+  if (!r.datos.asistencia && Array.isArray(r.datos.turnos)) {
+    r.datos.asistencia = r.datos.turnos; // respaldo de una versión anterior
+    delete r.datos.turnos;
+  }
   const n = (c) => (Array.isArray(r.datos[c]) ? r.datos[c].length : 0);
   // Fotos: solo imágenes en base64; cualquier otra cosa se rechaza antes de tocar los datos.
   const fotosEnArchivo = Array.isArray(r.fotos) ? r.fotos : [];

@@ -15,6 +15,8 @@ const RUTAS = {
   reportes: () => import('../modules/reportes.js'),
   ajustes: () => import('../modules/ajustes.js'),
 };
+// Módulo opcional: con CONFIG.modulos.asistencia en false, la pantalla y su acceso desaparecen.
+if (CONFIG.modulos.asistencia) RUTAS.asistencia = () => import('../modules/asistencia.js');
 
 // Extensiones activas en CONFIG.modulos (sueldos, mapa…): src/modules/extensiones/<carpeta>/index.js
 for (const ext of EXTENSIONES) {

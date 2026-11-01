@@ -1,7 +1,7 @@
 {
-  "name": "Control de Transporte",
-  "short_name": "Transporte",
-  "description": "Viajes, retrasos, choferes y combustible para supervisión de transporte de personal.",
+  "name": "Dilo group · Control de Transporte",
+  "short_name": "Dilo group",
+  "description": "Viajes, retrasos, choferes, combustible y reportes para la supervisión de transporte de Dilo group.",
   "lang": "es-DO",
   "dir": "ltr",
   "start_url": "./index.html#/inicio",
@@ -10,12 +10,35 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f2f4f7",
-  "theme_color": "#0f4c81",
-  "categories": ["business", "productivity"],
+  "theme_color": "#12334a",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
   ]
 }

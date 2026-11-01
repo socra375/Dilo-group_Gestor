@@ -39,7 +39,8 @@ function tablaRetrasos(id, titulo, filas, nombres) {
     ? (() => {
         const t = totalesRetrasos(filas);
         const max = Math.max(1, ...filas.map((f) => f.retrasados));
-        return `<div class="table-wrap"><table class="table">
+        return `<div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de ${esc(titulo.toLowerCase())}; se puede desplazar">
+          <table class="table">
           <thead><tr><th scope="col">${id === 'chofer' ? 'Chofer' : 'Ruta'}</th><th scope="col">Viajes</th><th scope="col">Retrasos</th><th scope="col">A tiempo</th></tr></thead>
           <tbody>${filas.map((f) => `<tr>
             <td><span style="display:grid;gap:4px">${esc(nombres.get(f.id) ?? '(eliminado)')}<span class="bar bar--warn" aria-hidden="true"><span style="width:${(f.retrasados / max) * 100}%"></span></span></span></td>
@@ -60,7 +61,7 @@ function tablaCombustible(filas, tipo) {
   return `<div class="segmented" role="group" aria-label="Agrupar combustible">
       <button type="button" data-comb="semana" aria-pressed="${tipo === 'semana'}">Por semana</button>
       <button type="button" data-comb="mes" aria-pressed="${tipo === 'mes'}">Por mes</button></div>
-    <div class="table-wrap"><table class="table">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de combustible por ${tipo}; se puede desplazar"><table class="table">
     <thead><tr><th scope="col">${tipo === 'semana' ? 'Semana (lunes)' : 'Mes'}</th><th scope="col">Cargas</th><th scope="col">${fmt.unidad('larga').replace(/^./, (c) => c.toUpperCase())}</th><th scope="col">Monto</th></tr></thead>
     <tbody>${filas.map((f) => `<tr><td><span style="display:grid;gap:4px">${esc(etiquetaPeriodo(f.periodo, tipo))}<span class="bar" aria-hidden="true"><span style="width:${(f.monto / max) * 100}%"></span></span></span></td><td>${f.cargas}</td><td>${fmt.numero(f.cantidad, 1)}</td><td>${fmt.dinero(f.monto)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Total</td><td>${t.cargas}</td><td>${fmt.numero(t.cantidad, 1)}</td><td>${fmt.dinero(t.monto)}</td></tr></tfoot>
@@ -72,7 +73,7 @@ function tablaVehiculos(filas, nombres) {
   const t = filas.reduce((s, f) => ({ cargas: s.cargas + f.cargas, galones: s.galones + f.galones, monto: s.monto + f.monto }), { cargas: 0, galones: 0, monto: 0 });
   const gal = fmt.unidad('larga').replace(/^./, (c) => c.toUpperCase());
   // 4 columnas (las cargas van como nota bajo la placa) para que el rendimiento se vea sin desplazar la tabla.
-  return `<div class="table-wrap"><table class="table">
+  return `<div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de combustible por vehículo; se puede desplazar"><table class="table">
     <thead><tr><th scope="col">Vehículo</th><th scope="col">${gal}</th><th scope="col">Monto</th><th scope="col">km/${fmt.unidad()}</th></tr></thead>
     <tbody>${filas.map((f) => `<tr><td>${esc(nombres.get(f.id) ?? '(eliminado)')}<br><small class="muted">${fmt.plural(f.cargas, 'carga', 'cargas')}</small></td><td>${fmt.numero(f.galones, 1)}</td><td>${fmt.dinero(f.monto)}</td><td>${f.kmGal != null ? fmt.numero(f.kmGal, 1) : '—'}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Total<br><small class="muted">${fmt.plural(t.cargas, 'carga', 'cargas')}</small></td><td>${fmt.numero(t.galones, 1)}</td><td>${fmt.dinero(t.monto)}</td><td></td></tr></tfoot>

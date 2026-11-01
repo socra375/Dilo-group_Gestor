@@ -55,7 +55,7 @@ export const META = {
   vehiculos: { singular: 'vehículo' },
   viajes: { singular: 'viaje' },
   combustible: { singular: 'carga', femenino: true },
-  turnos: { singular: 'turno' },
+  asistencia: { singular: 'registro' },
 };
 
 const ESQUEMAS = {
@@ -136,10 +136,11 @@ const ESQUEMAS = {
     { clave: 'fotoId', cfg: 'foto_recibo', etiqueta: 'Foto del recibo', tipo: 'foto', lado: 800 },
   ],
 
-  turnos: [
+  // Asistencia del chofer (CONFIG.modulos.asistencia). `fecha` es el día en que entró; la salida puede ser al día siguiente.
+  asistencia: [
     { clave: 'fecha', etiqueta: 'Fecha', tipo: 'fecha', requerido: true, fijo: true },
-    { clave: 'entrada', etiqueta: 'Hora de entrada', tipo: 'hora', requerido: true, fijo: true },
-    { clave: 'salida', etiqueta: 'Hora de salida', tipo: 'hora', fijo: true, ayuda: 'Si es menor que la entrada, se toma como el día siguiente.' },
+    { clave: 'entrada', etiqueta: 'Hora de entrada', tipo: 'hora', requerido: true, fijo: true, grupo: 'horas' },
+    { clave: 'salida', etiqueta: 'Hora de salida', tipo: 'hora', fijo: true, grupo: 'horas', ayuda: 'Si es menor que la entrada, se toma como el día siguiente. Déjala vacía si sigue en turno.' },
   ],
 };
 
