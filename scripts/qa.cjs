@@ -91,6 +91,13 @@ async function contraste(page) {
   });
 }
 
+// Espera a que el router muestre la pantalla pedida (si no, se revisaría la anterior y daría un falso verde).
+const TITULOS = { '#/inicio': 'Inicio', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/mas': 'Más' };
+async function ir(page, ruta) {
+  await page.evaluate((h) => { location.hash = h; }, ruta);
+  await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
+}
+
 // El tema de la app no sigue al sistema (claro por defecto; oscuro con el interruptor de Ajustes),
 // así que cada pasada fija la preferencia antes de cargar la página.
 async function fijarTema(ctx, tema) {
@@ -134,7 +141,7 @@ async function verificarTema(page, tema) {
     }
 
     for (const [nombre, ruta, accion] of PANTALLAS) {
-      await page.evaluate((h) => { location.hash = h; }, ruta);
+      await ir(page, ruta);
       await page.waitForTimeout(250);
       if (accion) {
         try { await accion(page); } catch (e) { fallos++; console.log(`✗ ${tema} ${nombre}: la acción falló (${e.message.split('\n')[0]})`); continue; }
@@ -176,7 +183,7 @@ async function verificarTema(page, tema) {
     await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
     await page.waitForSelector('.stat');
     for (const [nombre, ruta, accion] of PANTALLAS) {
-      await page.evaluate((h) => { location.hash = h; }, ruta);
+      await ir(page, ruta);
       await page.waitForTimeout(250);
       if (accion) await accion(page).catch(() => {});
       const fuera = await desbordes(page);
@@ -245,7 +252,7 @@ async function verificarTema(page, tema) {
     await page.mouse.move(700, 400);
     await page.waitForTimeout(350);
     for (const [nombre, ruta, accion] of PANTALLAS) {
-      await page.evaluate((h) => { location.hash = h; }, ruta);
+      await ir(page, ruta);
       await page.waitForTimeout(250);
       if (accion) { try { await accion(page); } catch { /* el formulario ya se cubre a 390 px */ continue; } }
       const fuera = await desbordes(page);

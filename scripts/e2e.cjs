@@ -9,6 +9,14 @@ const ok = (cond, msg) => {
 };
 
 // Reintenta una condición hasta `ms`: la lista se repinta de forma asíncrona tras guardar.
+// Navega y espera a que el router muestre la pantalla NUEVA (título incluido): si no, la prueba puede
+// leer la lista de la pantalla anterior, que sigue visible un instante.
+const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', inicio: 'Inicio' };
+async function ir(page, ruta) {
+  await page.evaluate((h) => { location.hash = `#/${h}`; }, ruta);
+  await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
+}
+
 // Lee una colección con el mismo store.js que usa la app (IndexedDB), dentro de la página.
 const leer = (page, col) => page.evaluate(async (c) => (await import('/src/data/store.js')).list(c, { archivados: 'todos' }), col);
 
@@ -118,7 +126,7 @@ async function espera(cond, ms = 4000) {
   await page.click('[data-dia="-1"]'); // volver a hoy
 
   // Turnos: marcar entrada y salida.
-  await page.evaluate(() => { location.hash = '#/choferes'; });
+  await ir(page, 'choferes');
   await page.waitForSelector('[data-lista] .item');
   const card = page.locator('.item', { hasText: 'Luis Manuel' });
   await card.locator('[data-accion="entrada"]').click();
@@ -137,7 +145,7 @@ async function espera(cond, ms = 4000) {
   // Archivar y restaurar un vehículo, con confirmación dentro de la página.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  await page.evaluate(() => { location.hash = '#/vehiculos'; });
+  await ir(page, 'vehiculos');
   await page.waitForSelector('[data-lista] .item');
   const vehiculosAntes = await page.locator('[data-lista] .item').count();
   await page.locator('[data-editar]').first().click();
@@ -155,7 +163,7 @@ async function espera(cond, ms = 4000) {
   ok(await espera(async () => (await page.textContent('#f-placa-err')).includes('Ya existe')), 'placa duplicada rechazada');
 
   // ---- Fase 2: choferes (ficha, foto, cédula), rutas (horarios), vehículos (vencimientos) ----
-  await page.evaluate(() => { location.hash = '#/choferes'; });
+  await ir(page, 'choferes');
   await page.waitForSelector('[data-lista] .item');
   await page.locator('.item', { hasText: 'Ramón Antonio Féliz' }).locator('[data-editar]').click();
   await page.waitForSelector('dialog.sheet .ficha');
@@ -196,7 +204,7 @@ async function espera(cond, ms = 4000) {
   ok(borrada && !(await leer(page, 'choferes')).find((c) => c.nombre === 'Ramón Antonio Féliz').fotoId, 'quitar la foto la borra del almacén');
 
   // Rutas: agregar y quitar horarios fijos.
-  await page.evaluate(() => { location.hash = '#/rutas'; });
+  await ir(page, 'rutas');
   await page.waitForSelector('[data-lista] .item');
   ok((await page.textContent('[data-lista]')).includes('Salidas: 5:30 a. m., 3:30 p. m.'), 'la lista de rutas muestra los horarios en 12 h');
   await page.locator('.item', { hasText: 'R1 Alcarrizos' }).locator('[data-editar]').click();
@@ -210,21 +218,21 @@ async function espera(cond, ms = 4000) {
   ok(JSON.stringify(r1.horarios) === JSON.stringify(['07:15', '15:30', '18:45']), `horarios guardados en orden: ${r1.horarios.join(', ')}`);
 
   // Vehículos: avisos de seguro y mantenimiento en la lista.
-  await page.evaluate(() => { location.hash = '#/vehiculos'; });
+  await ir(page, 'vehiculos');
   await page.waitForSelector('[data-lista] .item');
   const textoVeh = await page.textContent('[data-lista]');
   ok(textoVeh.includes('Seguro vence en 12 días'), 'vehículo con seguro por vencer avisa');
   ok(/Mantenimiento: faltan 350 km/.test(textoVeh), 'vehículo con mantenimiento próximo por km avisa');
 
   // Reportes: CSV descargable.
-  await page.evaluate(() => { location.hash = '#/reportes'; });
+  await ir(page, 'reportes');
   await page.waitForSelector('[data-csv="chofer"]');
   const [csv] = await Promise.all([page.waitForEvent('download'), page.click('[data-csv="chofer"]')]);
   const contenido = require('fs').readFileSync(await csv.path(), 'utf8');
   ok(contenido.startsWith('﻿Chofer,Viajes,Completados'), `CSV de retrasos por chofer (${csv.suggestedFilename()})`);
 
   // Ajustes: tolerancia inválida muestra error junto al campo.
-  await page.evaluate(() => { location.hash = '#/ajustes'; });
+  await ir(page, 'ajustes');
   await page.waitForSelector('#f-tolerancia');
   await page.fill('#f-tolerancia', '90');
   await page.dispatchEvent('#f-tolerancia', 'change');
