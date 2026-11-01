@@ -33,7 +33,7 @@ jobs:
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "configurado=no" >> "$GITHUB_OUTPUT"
-            echo "::notice::Cloudflare sin configurar (falta el secreto CLOUDFLARE_API_TOKEN o la variable CLOUDFLARE_ACCOUNT_ID). No se publica nada."
+            echo "::warning::Cloudflare sin configurar: falta CLOUDFLARE_API_TOKEN o CLOUDFLARE_ACCOUNT_ID. No se publicó nada."
           else
             echo "configurado=si" >> "$GITHUB_OUTPUT"
           fi
@@ -64,3 +64,25 @@ jobs:
       - name: Publicar
         if: steps.cf.outputs.configurado == 'si'
         run: npx --yes wrangler@4 pages deploy _site --project-name "$PROYECTO" --branch main --commit-hash "$GITHUB_SHA" --commit-message "Publicación $GITHUB_SHA"
+
+      - name: Enlace del sitio (aparece en el resumen de la ejecución)
+        if: steps.cf.outputs.configurado == 'si'
+        run: |
+          {
+            echo "## Sitio publicado en Cloudflare Pages"
+            echo ""
+            echo "Abre este enlace: **https://${PROYECTO}.pages.dev**"
+            echo ""
+            echo "Si el nombre ya estaba tomado, el despliegue habrá fallado; revisa el paso anterior."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Enlace: https://${PROYECTO}.pages.dev"
+
+      - name: Aviso si falta configuración
+        if: steps.cf.outputs.configurado == 'no'
+        run: |
+          {
+            echo "## Cloudflare no está configurado todavía"
+            echo ""
+            echo "No se publicó nada. Falta el secreto CLOUDFLARE_API_TOKEN o la variable CLOUDFLARE_ACCOUNT_ID."
+            echo "Sigue los pasos de la sección \"Publicar en Cloudflare Pages\" del README."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -64,6 +64,12 @@ test('armar-sitio: con variables válidas genera config.local.js; con una clave 
   fs.rmSync(destino, { recursive: true, force: true });
 });
 
+test('Cloudflare: el enlace del sitio se escribe en el resumen de la ejecución', () => {
+  const cf = leer('.github/workflows/cloudflare.yml');
+  assert.match(cf, /GITHUB_STEP_SUMMARY/);
+  assert.match(cf, /https:\/\/\$\{PROYECTO\}\.pages\.dev/);
+});
+
 test('flujos de publicación: usan armar-sitio.sh y Cloudflare no falla si aún no está configurado', () => {
   for (const f of ['.github/workflows/pages.yml', '.github/workflows/cloudflare.yml']) {
     assert.match(leer(f), /bash scripts\/armar-sitio\.sh _site/, `${f} debe armar el sitio con el script común`);
