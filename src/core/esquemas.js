@@ -24,6 +24,8 @@ export const PARAMETROS = {
   // Casilla "Tanque lleno" en cada carga (para un rendimiento correcto). En false se oculta y todas
   // las cargas cuentan como tanque lleno.
   campoTanqueLleno: true,
+  // Avisos que se ven en Inicio antes de "Ver todos".
+  avisosEnInicio: 3,
 };
 
 // Puntos de extensión (el cliente los quiere a futuro). Carpeta: src/modules/extensiones/<carpeta>/index.js.

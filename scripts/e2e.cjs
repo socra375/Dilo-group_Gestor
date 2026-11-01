@@ -11,7 +11,7 @@ const ok = (cond, msg) => {
 // Reintenta una condición hasta `ms`: la lista se repinta de forma asíncrona tras guardar.
 // Navega y espera a que el router muestre la pantalla NUEVA (título incluido): si no, la prueba puede
 // leer la lista de la pantalla anterior, que sigue visible un instante.
-const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', inicio: 'Inicio' };
+const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', inicio: 'Dilo group' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = `#/${h}`; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
@@ -259,14 +259,78 @@ async function espera(cond, ms = 4000) {
   // Avisos en Inicio y cada uno abre su ficha.
   await ir(page, 'inicio');
   await page.waitForSelector('.stat');
-  const avisosTexto = await page.textContent('[data-avisos]');
+  // La tarjeta muestra los 3 primeros; la lista completa está en "Ver todos".
+  await page.click('[data-ver-avisos]');
+  await page.waitForSelector('dialog.sheet[open] li');
+  const avisosTexto = await page.textContent('dialog.sheet[open]');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
   ok(avisosTexto.includes('Licencia vence en 10 días'), 'aviso: licencia por vencer');
   ok(avisosTexto.includes('Seguro vence en 12 días'), 'aviso: seguro por vencer');
   ok(/Mantenimiento: faltan 350 km/.test(avisosTexto), 'aviso: mantenimiento por kilometraje');
   ok(/peor que su promedio/.test(avisosTexto), 'aviso: combustible más alto de lo normal');
-  await page.locator('[data-avisos] a', { hasText: 'Seguro vence' }).click();
+  await page.click('[data-ver-avisos]');
+  await page.locator('dialog.sheet[open] a', { hasText: 'Seguro vence' }).click();
   ok(await espera(async () => (await page.locator('dialog.sheet[open] #f-placa').count()) === 1 && (await page.inputValue('#f-placa')) === 'I067310'), 'el aviso de seguro abre la ficha del vehículo');
   await page.keyboard.press('Escape');
+
+  // ---- Fase 5: Inicio "Resumen con números" ----
+  await ir(page, 'inicio');
+  await page.waitForSelector('.graf svg');
+  ok((await page.textContent('#header-title')) === 'Dilo group', 'el encabezado de Inicio muestra la empresa');
+  const fechaEnc = await page.textContent('#header-company');
+  const fechaEsp = await page.evaluate(async () => { const f = await import('/src/core/format.js'); const t = await import('/src/core/time.js'); const x = f.fechaLarga(t.hoyClave()); return x[0].toUpperCase() + x.slice(1); });
+  ok(fechaEnc === fechaEsp, `y la fecha de hoy (${fechaEnc})`);
+  const tarjetas = await page.locator('.stat__label').allTextContents();
+  ok(JSON.stringify(tarjetas) === JSON.stringify(['Viajes de hoy', 'Retrasos de hoy', 'Combustible de hoy', 'Choferes activos']), 'cuatro tarjetas: ' + tarjetas.join(' · '));
+  const esperado = await page.evaluate(async () => {
+    const st = await import('/src/data/store.js'); const t = await import('/src/core/time.js');
+    const hoy = t.hoyClave();
+    const viajes = (await st.list('viajes')).filter((v) => t.fechaClave(v.salidaProg) === hoy);
+    const gal = (await st.list('combustible')).filter((c) => c.fecha === hoy).reduce((a, c) => a + c.cantidad, 0);
+    return { viajes: viajes.length, choferes: (await st.list('choferes')).length, gal: Math.round(gal * 10) / 10 };
+  });
+  const valores = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-contador]')].map((n) => [n.dataset.contador, n.textContent])));
+  ok(valores.viajes === String(esperado.viajes) && valores.choferes === String(esperado.choferes), `totales coinciden con los datos (viajes ${valores.viajes}, choferes ${valores.choferes})`);
+  ok(valores.combustible === esperado.gal.toFixed(1), `combustible de hoy en galones (${valores.combustible})`);
+  // Avisos: lista corta (3) con "Ver todos" que abre la lista completa.
+  ok((await page.locator('[data-avisos] > li').count()) === 3, 'la tarjeta de avisos muestra 3');
+  const total = Number((await page.textContent('[data-ver-avisos]')).match(/\((\d+)\)/)[1]);
+  await page.click('[data-ver-avisos]');
+  await page.waitForSelector('dialog.sheet[open]');
+  ok((await page.locator('dialog.sheet[open] li').count()) === total && total > 3, `"Ver todos" abre la lista completa (${total})`);
+  ok((await page.textContent('dialog.sheet[open]')).includes('Urgente') || (await page.textContent('dialog.sheet[open]')).includes('Atención'), 'cada aviso indica su nivel con texto');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+
+  // Gráfica: 7 columnas, la última (hoy) resaltada, tooltip con teclado y tabla alternativa.
+  ok((await page.locator('.graf__col').count()) === 7, 'la gráfica tiene 7 días');
+  ok((await page.locator('.graf__col--hoy').count()) === 1 && (await page.locator('.graf__col').last().getAttribute('class')).includes('graf__col--hoy'), 'solo la barra de hoy está resaltada (la última)');
+  ok((await page.locator('.graf__x--hoy').first().textContent()) === 'hoy', 'el eje marca "hoy"');
+  const colorHoy = await page.evaluate(() => {
+    const css = (el) => getComputedStyle(el).fill;
+    const barras = [...document.querySelectorAll('.graf__col')].map((c) => c.querySelector('.graf__barra')).filter(Boolean);
+    return { n: barras.length, distintas: new Set(barras.map(css)).size };
+  });
+  ok(colorHoy.n >= 1, `hay barras dibujadas (${colorHoy.n})`);
+  const alturas = await page.evaluate(() => [...document.querySelectorAll('.graf__barra')].map((b) => Math.round(b.getBBox().width)));
+  ok(alturas.every((w) => w <= 24), 'ninguna barra pasa de 24 px de grosor');
+  await page.focus('.graf__col >> nth=0');
+  ok(await page.locator('.graf__tip').isVisible(), 'el tooltip aparece al enfocar una columna con el teclado');
+  ok(/retraso/.test(await page.textContent('.graf__tip')), 'el tooltip da el valor');
+  await page.keyboard.press('Escape');
+  ok(await page.locator('.graf__tip').isHidden(), 'Escape cierra el tooltip');
+  await page.click('.graf__tabla summary');
+  ok((await page.locator('.graf__tabla tbody tr').count()) === 7, 'la tabla alternativa lista los 7 días');
+  const sumaTabla = await page.evaluate(() => [...document.querySelectorAll('.graf__tabla tbody tr')].reduce((a, tr) => a + Number(tr.cells[2].textContent), 0));
+  const sumaBarras = await page.evaluate(async () => {
+    const st = await import('/src/data/store.js'); const t = await import('/src/core/time.js'); const ag = await import('/src/core/agregados.js'); const pr = JSON.parse(localStorage.getItem('ct:prefs'));
+    return ag.retrasosPorDia(await st.list('viajes'), { hoy: t.hoyClave(), tolerancia: pr.toleranciaMin }).reduce((a, d) => a + d.retrasos, 0);
+  });
+  ok(sumaTabla === sumaBarras, `la tabla suma lo mismo que los datos (${sumaTabla})`);
+  // Lista de los viajes de hoy con su estado.
+  ok((await page.locator('[data-lista] .item').count()) === esperado.viajes, 'la lista muestra los viajes de hoy con su estado');
+  ok((await page.locator('[data-lista] .item .chip').count()) >= esperado.viajes, 'cada viaje lleva su chip de estado');
 
   // Reportes: CSV descargable.
   await ir(page, 'reportes');
@@ -326,6 +390,21 @@ async function espera(cond, ms = 4000) {
   ok(toasts.tocable, 'los toasts no se tragan los toques');
 
   ok(!errores.length, `sin errores de consola${errores.length ? `: ${errores.join(' | ')}` : ''}`);
+  // Inicio sin datos: todo en cero y estado vacío positivo (no depende de la hora del día).
+  {
+    const ctx3 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', timezoneId: 'America/Santo_Domingo' });
+    await ctx3.addInitScript(() => localStorage.setItem('ct:prefs', JSON.stringify({ sembrado: true })));
+    const p3 = await ctx3.newPage();
+    await p3.goto(`${base}#/inicio`);
+    await p3.waitForSelector('.graf svg');
+    ok((await p3.textContent('[data-avisos], #t-avisos ~ .empty, .empty__title')).includes('Todo en orden'), 'sin avisos: estado vacío positivo "Todo en orden"');
+    const ceros = await p3.evaluate(() => [...document.querySelectorAll('[data-contador]')].map((n) => n.textContent).join(','));
+    ok(ceros.split(',').every((x) => Number(x) === 0) && ceros.split(',').length === 4, `con la base vacía las cuatro tarjetas están en 0 (${ceros})`);
+    ok((await p3.locator('.graf__barra').count()) === 0 && (await p3.locator('.graf__col').count()) === 7, 'la gráfica muestra 7 días sin barras');
+    ok((await p3.textContent('.section:last-of-type')).includes('No hay viajes programados hoy'), 'sin viajes: estado vacío con instrucción');
+    await ctx3.close();
+  }
+
   // Migración: datos de la versión anterior (localStorage) pasan a IndexedDB una sola vez.
   {
     const ctx2 = await navegador.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });

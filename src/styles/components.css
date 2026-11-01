@@ -851,3 +851,72 @@ dialog::backdrop { background: var(--scrim); }
 .motivo { display: grid; gap: var(--sp-2); }
 .motivo__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .motivo__chips .filter[aria-checked='true'] { background: var(--c-text); border-color: var(--c-text); color: var(--c-bg); }
+
+/* ---------- Inicio: 4 tarjetas, avisos y gráfica ---------- */
+.stats--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 520px) { .stats--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stat--error { border-color: color-mix(in oklab, var(--c-error) 45%, var(--c-border)); background: var(--c-error-bg); }
+.stat--error .stat__value { color: var(--c-error); }
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 56px;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-left-width: 5px;
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  text-decoration: none;
+}
+.aviso:hover { background: var(--c-surface-2); }
+.aviso--urgente { border-left-color: var(--c-error); }
+.aviso--urgente > .icon:first-child { color: var(--c-error); }
+.aviso--atencion { border-left-color: var(--c-warn); }
+.aviso--atencion > .icon:first-child { color: var(--c-warn); }
+.aviso__cuerpo { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.aviso__titulo { font-weight: 700; overflow-wrap: anywhere; }
+.aviso__texto { font-size: var(--fs-sm); color: var(--c-text-muted); overflow-wrap: anywhere; }
+/* El nivel va con texto además del color: la severidad nunca depende solo del color. */
+.aviso__nivel { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--c-text-muted); }
+.aviso--urgente .aviso__nivel { color: var(--c-error); }
+.aviso--atencion .aviso__nivel { color: var(--c-warn); }
+
+.graf { display: grid; gap: var(--sp-2); margin: 0; }
+.graf__titulo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-2); font-family: var(--font-display); font-size: var(--fs-lg); }
+.graf__titulo .muted { font-family: var(--font-body); font-size: var(--fs-sm); }
+.graf__lienzo { position: relative; }
+.graf svg { width: 100%; height: auto; overflow: visible; }
+.graf__rejilla { stroke: var(--c-border); stroke-width: 1; }
+.graf__rejilla--base { stroke: var(--c-border-strong); }
+.graf__eje, .graf__x { fill: var(--c-text-muted); font-size: 0.74rem; font-family: var(--font-body); }
+.graf__x--dia { font-variant-numeric: tabular-nums; }
+.graf__x--hoy { fill: var(--c-text); font-weight: 700; }
+.graf__valor { fill: var(--c-text); font-size: 0.82rem; font-weight: 700; font-family: var(--font-body); font-variant-numeric: tabular-nums; }
+.graf__barra { fill: var(--chart-dim); transform-box: fill-box; transform-origin: 50% 100%; animation: barra-sube 520ms var(--ease-out) both; transition: opacity var(--dur-fast); }
+.graf__col--hoy .graf__barra { fill: var(--chart-hoy); }
+.graf__col { cursor: default; outline: none; }
+.graf__col--activa .graf__barra, .graf__col:hover .graf__barra { opacity: 0.8; }
+.graf__col:focus-visible .graf__area { stroke: var(--c-focus); stroke-width: 2; rx: 6; }
+.graf__tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-2);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+.graf__tip[hidden] { display: none; }
+.graf__tip strong { font-size: var(--fs-base); }
+.graf__tip span { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.graf__tabla summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--c-primary); font-weight: 700; font-size: var(--fs-sm); }
+.graf__fila-hoy th, .graf__fila-hoy td { font-weight: 700; }
+.graf__tabla th[scope='row'] { text-align: left; font-weight: 400; }

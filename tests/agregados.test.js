@@ -55,3 +55,31 @@ test('aCSV escapa comas, comillas y saltos de línea', () => {
   assert.ok(csv.includes('"Pérez, Juan","dijo ""hola"""'));
   assert.ok(csv.includes('Ana,"a\nb"'));
 });
+
+import { retrasosPorDia } from '../src/core/agregados.js';
+
+test('retrasosPorDia: 7 días terminando hoy, con ceros, y solo cuenta retrasos sobre la tolerancia', () => {
+  const v = (dia, salida, llegada, llegadaReal, extra = {}) => viaje('a', dia, salida, llegada, llegadaReal, extra);
+  const viajes = [
+    v('2026-10-26', '08:00', '09:00', '09:20'), // +20 → retraso (hoy)
+    v('2026-10-26', '10:00', '11:00', '11:05'), // +5 = tolerancia → no
+    v('2026-10-26', '12:00', '13:00', null),    // sin llegada → no cuenta como retraso
+    v('2026-10-24', '08:00', '09:00', '09:40'), // +40
+    v('2026-10-24', '10:00', '11:00', '11:10'), // +10
+    v('2026-10-24', '12:00', '13:00', '13:30', { archivado: true }), // archivado: ignorado
+    v('2026-10-19', '08:00', '09:00', '10:00'), // fuera de los 7 días
+  ];
+  const r = retrasosPorDia(viajes, { hoy: '2026-10-26', dias: 7, tolerancia: 5, ahora: new Date(aISO('2026-10-26', '18:00')) });
+  assert.equal(r.length, 7);
+  assert.equal(r[0].fecha, '2026-10-20');
+  assert.equal(r[6].fecha, '2026-10-26');
+  assert.deepEqual(r.map((d) => d.retrasos), [0, 0, 0, 0, 2, 0, 1]);
+  assert.deepEqual([r[6].viajes, r[4].viajes], [3, 2]);
+  assert.equal(r[4].minutos, 50);
+});
+
+test('retrasosPorDia: sin viajes devuelve 7 días en cero', () => {
+  const r = retrasosPorDia([], { hoy: '2026-11-01', tolerancia: 5 });
+  assert.deepEqual(r.map((d) => d.retrasos), [0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(r[0].fecha, '2026-10-26');
+});

@@ -73,3 +73,25 @@ export function aCSV(encabezados, filas) {
   };
   return `﻿${[encabezados, ...filas].map((f) => f.map(celda).join(',')).join('\r\n')}\r\n`;
 }
+
+/**
+ * Retrasos por día de los últimos `dias` días (el último es `hoy`). Un viaje cuenta en el día de su salida
+ * programada; "retraso" = llegó más tarde que la tolerancia. Siempre devuelve `dias` entradas (con ceros).
+ */
+export function retrasosPorDia(viajes, { hoy, dias = 7, tolerancia, ahora = new Date() }) {
+  const lista = [];
+  for (let i = dias - 1; i >= 0; i--) lista.push({ fecha: sumarDias(hoy, -i), viajes: 0, retrasos: 0, minutos: 0 });
+  const porFecha = new Map(lista.map((d) => [d.fecha, d]));
+  for (const v of viajes) {
+    if (v.archivado) continue;
+    const d = porFecha.get(fechaClave(v.salidaProg));
+    if (!d) continue;
+    d.viajes++;
+    const e = estadoViaje(v, ahora, tolerancia);
+    if (e.puntualidad === 'retrasado') {
+      d.retrasos++;
+      d.minutos += e.retrasoMin;
+    }
+  }
+  return lista;
+}

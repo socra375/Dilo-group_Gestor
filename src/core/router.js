@@ -65,7 +65,9 @@ async function mostrar(animar = true) {
   vista.replaceChildren(nueva);
 
   document.getElementById('header-title').textContent = modulo.titulo;
-  document.title = `${modulo.titulo} · ${CONFIG.empresa.nombre}`;
+  // Línea pequeña sobre el título: la empresa, o lo que el módulo pida (Inicio muestra la fecha de hoy).
+  document.getElementById('header-company').textContent = modulo.supratitulo?.() ?? CONFIG.empresa.nombre;
+  document.title = modulo.titulo === CONFIG.empresa.nombre ? modulo.titulo : `${modulo.titulo} · ${CONFIG.empresa.nombre}`;
   for (const a of document.querySelectorAll('.tabbar a')) {
     if (a.dataset.tab === (modulo.pestana ?? ruta)) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');

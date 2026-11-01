@@ -56,6 +56,9 @@
   --c-accent: var(--accent);
   --c-on-accent: #1d1400;
   --c-header: var(--brand);
+  /* Gráfica con énfasis (una serie): hoy en el acento, el resto en gris apagado. Ambos >= 3:1 sobre la tarjeta. */
+  --chart-hoy: var(--brand);
+  --chart-dim: #7d8ea0;
   --c-on-header: #ffffff;
   --c-on-header-muted: rgb(255 255 255 / 0.78);
 
@@ -93,6 +96,9 @@
   --c-primary-soft: color-mix(in oklab, var(--brand) 40%, #121a22);
   --c-on-primary: #061a2c;
   --c-on-accent: #1d1400;
+
+  --chart-hoy: #9fd0ff;
+  --chart-dim: #5d7083;
 
   --c-bg: #0c1218;
   --c-surface: #141c24;

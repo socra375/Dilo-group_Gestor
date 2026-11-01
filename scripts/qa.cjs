@@ -92,7 +92,7 @@ async function contraste(page) {
 }
 
 // Espera a que el router muestre la pantalla pedida (si no, se revisaría la anterior y daría un falso verde).
-const TITULOS = { '#/inicio': 'Inicio', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/mas': 'Más' };
+const TITULOS = { '#/inicio': 'Dilo group', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/mas': 'Más' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = h; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
