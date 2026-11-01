@@ -63,7 +63,7 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
   await pa.goto(base);
   await pa.waitForSelector('.login');
   ok((await titulo(pa)) === 'Entrar' && (await pa.evaluate(() => document.body.classList.contains('modo-nube'))), 'con config.local.js la app arranca en modo nube y pide entrar');
-  ok(await pa.locator('#badge-ejemplo').isHidden(), 'no aparece la franja "datos de ejemplo"');
+  ok((await pa.locator('#badge-ejemplo').count()) === 0 && (await pa.locator('#demo-note').isHidden()), 'no hay franja de ejemplo ni aviso de demostración en modo nube');
   ok(!(await pa.evaluate(() => [...document.querySelectorAll('.tabbar a, .rail a')].some((a) => a.offsetParent !== null))), 'sin sesión no se ve la navegación (nadie llega a las pantallas)');
   ok((await pa.evaluate(async () => (await indexedDB.databases()).length)) === 0, 'no se creó ninguna base local ni datos de demostración');
   ok(falso.estado.peticiones.every((p) => !p.ruta.startsWith('/rest/')), 'antes de entrar no se pidió ningún dato a la API');
@@ -82,7 +82,7 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
   ok(await espera(async () => (await titulo(pa)) === 'Dilo group'), 'con la sesión correcta se llega a Inicio');
   const ceros = await pa.evaluate(() => [...document.querySelectorAll('[data-contador]')].map((n) => n.textContent));
   ok(ceros.length === 4 && ceros.every((x) => Number(x) === 0), 'cuenta nueva: todo en cero, sin datos de ejemplo');
-  ok(await pa.locator('#badge-ejemplo').isHidden(), 'sigue sin franja de ejemplo');
+  ok(await pa.locator('[data-pasos]').isVisible(), 'cuenta nueva: Inicio guía los primeros pasos');
 
   // Crear un chofer con cédula y foto
   await pa.evaluate(() => { location.hash = '#/choferes'; });
@@ -169,7 +169,6 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
   await pa.evaluate(() => { location.hash = '#/ajustes'; });
   await pa.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Ajustes');
   ok((await pa.textContent('#t-cuenta + dl, [aria-labelledby="t-cuenta"]')).includes('ana@dilo.test'), 'Ajustes muestra la cuenta activa');
-  ok((await pa.locator('[data-borrar-ejemplo], [data-borrar-todo]').count()) >= 0, 'Ajustes carga en modo nube');
   await pa.click('[data-cerrar-sesion]');
   await pa.waitForSelector('.login');
   ok((await pa.evaluate(() => localStorage.getItem('ct:sesion'))) === null, 'cerrar sesión borra la sesión guardada');
@@ -208,8 +207,8 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
   const ctxD = await navegador.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const pd = await ctxD.newPage();
   await pd.goto(`${base}#/choferes`);
-  await pd.waitForSelector('[data-lista] .item');
-  ok(!(await pd.evaluate(() => document.body.classList.contains('modo-nube'))) && (await pd.locator('#badge-ejemplo').isVisible()), 'sin config.local.js sigue el modo demostración (con su franja)');
+  await pd.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Choferes');
+  ok(!(await pd.evaluate(() => document.body.classList.contains('modo-nube'))) && (await pd.locator('#demo-note').isVisible()), 'sin config.local.js sigue el modo demostración (con su aviso)');
   await ctxD.close();
 
   await navegador.close();

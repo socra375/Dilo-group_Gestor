@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
 const { crear } = require('./serve.cjs');
+const { abrirConEjemplo } = require('./ayudas.cjs');
 
 const SALIDA = path.resolve(__dirname, '../qa/capturas');
 
@@ -138,6 +139,8 @@ async function verificarTema(page, tema) {
   const navegador = await chromium.launch();
   // Esperado: en modo demostración src/config.local.js no existe (está en .gitignore) y el navegador registra su 404. Solo ese recurso.
 const esperado404 = (m) => /status of 404/.test(m.text()) && /config\.local\.js/.test(m.location().url);
+// Sin internet (p. ej. un entorno aislado) las fuentes de Google no cargan; el QA ya lo ignoraba en `requestfailed`. Solo esos dominios.
+const esperadoFuentes = (m) => /fonts\.g(oogleapis|static)\.com/.test(m.location().url) || /^Couldn't load preload assets/.test(m.text());
 
 let fallos = 0;
 
@@ -150,11 +153,11 @@ let fallos = 0;
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
     const errores = [];
-    page.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !esperado404(m)) errores.push(`[${m.type()}] ${m.text()}`); });
+    page.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !esperado404(m) && !esperadoFuentes(m)) errores.push(`[${m.type()}] ${m.text()} ${m.location().url}`); });
     page.on('pageerror', (e) => errores.push(`[pageerror] ${e.message}`));
     page.on('requestfailed', (r) => { if (!r.url().includes('fonts.g') && !r.url().includes('config.local.js')) errores.push(`[request] ${r.url()} ${r.failure()?.errorText}`); });
 
-    await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
+    await abrirConEjemplo(page, `http://localhost:${puerto}/index.html`, '#/inicio'); // la app arranca vacía: se cargan los datos de prueba
     await page.waitForLoadState('networkidle');
     if (!(await verificarTema(page, tema))) {
       fallos++;
@@ -206,7 +209,7 @@ let fallos = 0;
     });
     const page = await ctx.newPage();
     page.setDefaultTimeout(5000);
-    await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
+    await abrirConEjemplo(page, `http://localhost:${puerto}/index.html`, '#/inicio'); // la app arranca vacía: se cargan los datos de prueba
     await page.waitForSelector('.stat');
     for (const [nombre, ruta, accion] of PANTALLAS) {
       await ir(page, ruta);
@@ -233,8 +236,8 @@ let fallos = 0;
     page.setDefaultTimeout(5000);
     const errores = [];
     page.on('pageerror', (e) => errores.push(e.message));
-    page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m)) errores.push(m.text()); });
-    await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
+    page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m) && !esperadoFuentes(m)) errores.push(m.text()); });
+    await abrirConEjemplo(page, `http://localhost:${puerto}/index.html`, '#/inicio'); // la app arranca vacía: se cargan los datos de prueba
     await page.waitForSelector('.stat');
     const nombreTema = tema === 'light' ? 'claro' : 'oscuro';
     const chequear = (cond, msg) => {
@@ -335,6 +338,33 @@ let fallos = 0;
     const ok = reducir ? m.vista <= 0.002 : m.vista >= 0.15 && m.vista <= 0.25 && m.nombre.includes('view-in');
     console.log(`${ok ? '✓' : '✗'} movimiento ${reducir ? 'reducido: sin animación' : 'normal: cambio de pantalla de 160–200 ms'} (${m.nombre}, ${(m.vista * 1000).toFixed(0)} ms)`);
     if (!ok) fallos++;
+    await ctx.close();
+  }
+
+  // Primera vez: la app arranca VACÍA. Es lo primero que ve el cliente, así que se revisa igual que lo demás
+  // (desbordes, contraste, accesibilidad, errores de consola), en claro y oscuro.
+  for (const tema of ['light', 'dark']) {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: tema, reducedMotion: 'reduce', locale: 'es-DO', timezoneId: 'America/Santo_Domingo', serviceWorkers: 'block' });
+    await fijarTema(ctx, tema);
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(5000);
+    const errores = [];
+    page.on('pageerror', (e) => errores.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m) && !esperadoFuentes(m)) errores.push(m.text()); });
+    await page.goto(`http://localhost:${puerto}/index.html#/inicio`);
+    await page.waitForSelector('[data-pasos]');
+    for (const ruta of ['#/inicio', '#/viajes', '#/choferes', '#/vehiculos', '#/rutas', '#/combustible', '#/reportes', '#/asistencia', '#/ajustes', '#/mas']) {
+      await ir(page, ruta);
+      await page.waitForTimeout(250);
+      const fuera = await desbordes(page);
+      const bajos = await contraste(page);
+      const a11y = await accesibilidad(page);
+      const problemas = [...fuera.map((x) => `desborde: ${x}`), ...bajos.map((x) => `contraste: ${x}`), ...a11y.map((v) => `${v.id} (${v.impacto}): ${v.ayuda} → ${v.ej}`)];
+      const nombre = ruta.slice(2);
+      if (['inicio', 'choferes', 'viajes'].includes(nombre)) await page.screenshot({ path: path.join(SALIDA, `${tema === 'light' ? 'claro' : 'oscuro'}-vacio-${nombre}.png`), fullPage: true });
+      if (problemas.length) { fallos++; console.log(`✗ ${tema} vacío ${nombre}\n   ${problemas.join('\n   ')}`); } else console.log(`✓ ${tema} vacío ${nombre}`);
+    }
+    if (errores.length) { fallos++; console.log(`✗ ${tema} vacío: errores de consola\n   ${[...new Set(errores)].join('\n   ')}`); }
     await ctx.close();
   }
 

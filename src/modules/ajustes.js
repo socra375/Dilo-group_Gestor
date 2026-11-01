@@ -1,11 +1,10 @@
-// Ajustes del dispositivo, respaldo (exportar/importar JSON) y datos de ejemplo.
+// Ajustes del dispositivo y respaldo (exportar/importar JSON).
 import * as store from '../data/store.js';
 import { VERSION_APP } from '../core/esquemas.js';
 import { pref, setPref, avisosConfig } from '../core/prefs.js';
 import { hoyClave, fechaClave } from '../core/time.js';
 import * as fmt from '../core/format.js';
 import { esc, icon, toast, confirmar, descargar } from '../core/ui.js';
-import { hayDatosEjemplo, borrarDatosEjemplo, referenciasReales } from '../data/seed.js';
 import { refrescar } from '../core/router.js';
 
 const FORMATO = 2; // 2: incluye las fotos (en base64). Los respaldos de formato 1 (sin fotos) se siguen pudiendo importar.
@@ -61,7 +60,6 @@ async function importarRespaldo(archivo) {
   if (!ok) return false;
   const fotos = await Promise.all(fotosEnArchivo.map(async (f) => ({ id: f.id, tipo: f.tipo, creado: f.creado, blob: await dataUrlABlob(f.datos) })));
   await store.replaceAll(r.datos, fotos);
-  setPref('sembrado', true);
   toast('Respaldo restaurado.');
   return true;
 }
@@ -101,7 +99,6 @@ export default {
   titulo: 'Ajustes',
   pestana: 'mas',
   async render(el) {
-    const ejemplo = await hayDatosEjemplo();
     const ultimo = pref('ultimoRespaldo');
     const persistente = await navigator.storage?.persisted?.().catch(() => false);
     const avisos = avisosConfig();
@@ -142,7 +139,7 @@ export default {
 
       <section class="card section" aria-labelledby="t-respaldo">
         <h2 class="section__title" id="t-respaldo">Respaldo</h2>
-        <p class="muted">Los datos viven solo en este teléfono. Exporta un respaldo cada semana y guárdalo fuera del teléfono.</p>
+        <p class="muted">${store.nubeActiva() ? 'Tus datos están en la nube, protegidos por tu cuenta. Un respaldo es una copia extra que guardas tú.' : 'Los datos viven solo en este teléfono. Exporta un respaldo cada semana y guárdalo fuera del teléfono.'}</p>
         <p><strong>Último respaldo:</strong> ${ultimo ? `${fmt.fechaNum(fechaClave(ultimo))}, ${fmt.hora(ultimo)}` : 'nunca'}</p>
         <div class="stack">
           <button type="button" class="btn btn--primary btn--block" data-exportar>${icon('download')}Exportar respaldo (JSON)</button>
@@ -151,12 +148,6 @@ export default {
           <p class="field__error" id="f-importar-err" aria-live="polite"></p>
         </div>
       </section>
-
-      ${ejemplo ? `<section class="card section" aria-labelledby="t-ejemplo" style="border-color:var(--c-warn)">
-        <h2 class="section__title" id="t-ejemplo">Datos de ejemplo</h2>
-        <p class="muted">La app trae choferes, rutas, vehículos, viajes y cargas de ejemplo para que veas cómo funciona. Bórralos antes de empezar a usarla en serio.</p>
-        <button type="button" class="btn btn--danger btn--block" data-borrar-ejemplo>${icon('trash')}Borrar todos los datos de ejemplo</button>
-      </section>` : ''}
 
       ${store.nubeActiva() ? `<section class="card section" aria-labelledby="t-cuenta">
         <h2 class="section__title" id="t-cuenta">Cuenta</h2>
@@ -241,18 +232,6 @@ export default {
         el.querySelectorAll('[data-letra]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       } else if (b.hasAttribute('data-exportar')) {
         await exportarRespaldo();
-        refrescar();
-      } else if (b.hasAttribute('data-borrar-ejemplo')) {
-        const refs = await referenciasReales();
-        const ok = await confirmar({
-          titulo: '¿Borrar los datos de ejemplo?',
-          mensaje: `Se borran los choferes, rutas, vehículos, viajes, turnos y cargas de ejemplo. Lo que tú registraste se queda.${refs ? ` Ojo: ${refs} registro(s) tuyos usan datos de ejemplo y mostrarán “(eliminado)”.` : ''}`,
-          confirmar: 'Borrar',
-          peligro: true,
-        });
-        if (!ok) return;
-        const n = await borrarDatosEjemplo();
-        toast(`${fmt.plural(n, 'registro borrado', 'registros borrados')}.`);
         refrescar();
       }
     });

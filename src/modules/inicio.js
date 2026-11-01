@@ -38,11 +38,11 @@ function calcular({ viajes, combustible, choferes, refs }) {
 
   const avisos = calcularAvisos({ viajes, choferes, combustible, vehiculos: refs.listas.vehiculos, rutas: refs.listas.rutas }, { hoy, ahora, tolerancia: tol })
     .map((a) => ({ severidad: a.severidad, titulo: a.titulo, texto: a.texto, href: a.href }));
-  // SUPUESTO: recordatorio de respaldo mientras los datos vivan solo en este teléfono (solo con datos reales).
-  const reales = [viajes, combustible, choferes].some((l) => l.some((x) => !x.ejemplo));
+  // SUPUESTO: recordatorio de respaldo mientras los datos vivan solo en este teléfono (en la nube no hace falta).
+  const hayDatos = [viajes, combustible, choferes].some((l) => l.length);
   const ultimo = pref('ultimoRespaldo');
   const dias = ultimo ? diasEntre(fechaClave(ultimo), hoy) : null;
-  if (reales && (dias === null || dias > PARAMETROS.diasAvisoRespaldo)) {
+  if (!store.nubeActiva() && hayDatos && (dias === null || dias > PARAMETROS.diasAvisoRespaldo)) {
     avisos.push({ severidad: 'atencion', icono: 'shield', titulo: 'Haz un respaldo de tus datos', texto: dias === null ? 'Aún no has exportado ningún respaldo.' : `El último fue hace ${fmt.plural(dias, 'día', 'días')}.`, href: '#/ajustes' });
   }
 
@@ -81,6 +81,35 @@ function bloqueAvisos(avisos) {
   </section>`;
 }
 
+/**
+ * Guía para la primera vez (la app arranca vacía): qué agregar y en qué orden. Desaparece cuando ya hay al menos un
+ * vehículo, un chofer y una ruta con horarios. Cada paso lleva a su pantalla.
+ */
+export function pasosIniciales({ vehiculos, choferes, rutas, viajes }) {
+  const pasos = [
+    { id: 'vehiculos', hecho: vehiculos.length > 0, titulo: 'Agrega tus vehículos', texto: 'Placa, seguro y próximo mantenimiento (de ahí salen los avisos).', href: '#/vehiculos', icono: 'truck' },
+    { id: 'choferes', hecho: choferes.length > 0, titulo: 'Registra a tus choferes', texto: 'Nombre, teléfono, licencia y su vehículo asignado.', href: '#/choferes', icono: 'user' },
+    { id: 'rutas', hecho: rutas.some((r) => r.horarios?.length), titulo: 'Crea tus rutas con sus horarios', texto: 'Con los horarios fijos de salida se generan los viajes del día.', href: '#/rutas', icono: 'route' },
+  ];
+  if (CONFIG.viajes.generar_desde_horarios) {
+    pasos.push({ id: 'viajes', hecho: viajes.length > 0, titulo: 'Genera los viajes de hoy', texto: 'En Viajes, con un toque, a partir de los horarios de las rutas.', href: '#/viajes', icono: 'calendar', opcional: true });
+  }
+  return pasos;
+}
+
+function bloquePasos(pasos) {
+  const obligatorios = pasos.filter((p) => !p.opcional);
+  if (obligatorios.every((p) => p.hecho)) return '';
+  const hechos = obligatorios.filter((p) => p.hecho).length;
+  return `<section class="card section" aria-labelledby="t-pasos" data-pasos>
+    <div class="section__head"><h2 class="section__title" id="t-pasos">Primeros pasos</h2><span class="muted">${hechos} de ${obligatorios.length}</span></div>
+    <p class="muted">Aquí todavía no hay datos. Agrega los tuyos en este orden y la pantalla de Inicio se llena sola.</p>
+    <ol class="pasos">${pasos.map((p, i) => `<li><a class="paso ${p.hecho ? 'paso--hecho' : ''}" href="${esc(p.href)}" data-paso="${p.id}">
+        <span class="paso__marca" aria-hidden="true">${p.hecho ? icon('check', 'icon--sm') : i + 1}</span>
+        <span class="paso__cuerpo"><span class="paso__titulo">${esc(p.titulo)}${p.hecho ? '<span class="sr-only"> (hecho)</span>' : ''}</span><span class="paso__texto">${esc(p.texto)}</span></span>${icon('chevron', 'icon--sm')}</a></li>`).join('')}</ol>
+  </section>`;
+}
+
 export default {
   titulo: CONFIG.empresa.nombre,
   pestana: 'inicio',
@@ -101,6 +130,7 @@ export default {
       ultimos = { viajes, refs, avisos: d.avisos };
 
       cuerpo.innerHTML = `<div class="view">
+        ${bloquePasos(pasosIniciales({ vehiculos: refs.listas.vehiculos, choferes, rutas: refs.listas.rutas, viajes }))}
         ${tarjetas(d.totales)}
         ${bloqueAvisos(d.avisos)}
         <section class="card section" aria-label="Retrasos por día">${graficaRetrasosHTML(d.retrasosDia, { titulo: 'Retrasos por día', id: 'retrasos-dia' })}</section>

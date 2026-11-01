@@ -116,24 +116,6 @@
 .chip--neutro { background: var(--c-neutral-bg); color: var(--c-neutral); }
 .chip--plain::before { display: none; }
 
-.badge-ejemplo {
-  order: 3;
-  flex: 1 0 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4em;
-  min-height: 36px;
-  padding: 0 0.7em;
-  border: 1.5px dashed var(--c-warn);
-  border-radius: var(--r-md);
-  background: var(--c-warn-bg);
-  color: var(--c-warn);
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  cursor: pointer;
-}
-.badge-ejemplo[hidden] { display: none; }
 
 /* ---------- Formularios ---------- */
 .form { display: grid; gap: var(--sp-4); }
@@ -743,13 +725,14 @@ dialog::backdrop { background: var(--scrim); }
     font-size: var(--fs-lg);
     text-decoration: none;
   }
-  .tabbar__brand img {
-    flex: none;
-    width: 40px;
+  .tabbar__logo {
+    width: 56px;
     height: 40px;
     margin-left: 8px;
-    border-radius: var(--r-md);
   }
+  .tabbar__logo img { width: 44px; }
+
+  .app-header__logo { display: none; }
 
   /* El contenido ya no necesita espacio para la barra inferior. */
   .app-main { padding-bottom: var(--sp-7); }
@@ -928,7 +911,56 @@ dialog::backdrop { background: var(--scrim); }
 /* ---------- Inicio de sesión (Supabase) ---------- */
 .login { display: grid; gap: var(--sp-4); max-width: 420px; margin: var(--sp-6) auto 0; }
 /* Sin sesión no se muestra nada de la app: ni menú, ni botones, ni avisos de datos de ejemplo. */
-body.sin-sesion .tabbar, body.sin-sesion #tema-rapido, body.sin-sesion #badge-ejemplo, body.sin-sesion .fab { display: none !important; }
+body.sin-sesion .tabbar, body.sin-sesion #tema-rapido, body.sin-sesion .fab { display: none !important; }
 body.sin-sesion { padding-left: 0 !important; }
 /* Con datos reales en la nube desaparece el aviso de modo demostración. */
-body.modo-nube .demo-note, body.modo-nube #badge-ejemplo { display: none !important; }
+body.modo-nube .demo-note { display: none !important; }
+
+/* ---------- Logo del cliente ---------- */
+/* El logo es gris y ámbar sobre fondo blanco: va siempre en una pastilla blanca, así se ve igual en claro, en oscuro
+   y sobre el azul marino del encabezado. */
+.logo-tile {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  background: #ffffff;
+  border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.logo-tile img { display: block; height: auto; }
+.app-header__logo { width: 52px; height: 38px; text-decoration: none; }
+.app-header__logo img { width: 42px; }
+.logo-tile--grande { width: min(100%, 280px); padding: var(--sp-3) var(--sp-4); margin: 0 auto var(--sp-4); }
+.logo-tile--grande img { width: 100%; }
+
+/* ---------- Primeros pasos (la app arranca vacía) ---------- */
+.pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
+.paso {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 56px;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  text-decoration: none;
+}
+.paso:hover { background: var(--c-surface-2); }
+.paso__marca {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-strong);
+  font-weight: 700;
+}
+.paso--hecho .paso__marca { background: var(--c-ok-bg, var(--c-primary-soft)); color: var(--c-ok); }
+.paso__cuerpo { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.paso__titulo { font-weight: 700; }
+.paso--hecho .paso__titulo { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--c-text-muted); }
+.paso__texto { color: var(--c-text-muted); font-size: var(--fs-sm); }

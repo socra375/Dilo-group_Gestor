@@ -9,7 +9,6 @@ const porDefecto = () => ({
   tema: CONFIG.tema.modo, // 'claro' | 'oscuro'
   letra: CONFIG.tema.letra, // 'normal' | 'grande' | 'extra'
   toleranciaMin: CONFIG.viajes.tolerancia_min,
-  sembrado: false,
   ultimoRespaldo: null,
 });
 

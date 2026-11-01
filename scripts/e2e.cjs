@@ -1,6 +1,7 @@
 // Flujos principales en navegador headless (390 px). Uso: node scripts/e2e.cjs
 const { chromium } = require('playwright');
 const { crear } = require('./serve.cjs');
+const { abrirConEjemplo } = require('./ayudas.cjs');
 
 // Esperado: en modo demostración src/config.local.js no existe (está en .gitignore) y el navegador registra su 404. Solo ese recurso.
 const esperado404 = (m) => /status of 404/.test(m.text()) && /config\.local\.js/.test(m.location().url);
@@ -44,7 +45,7 @@ async function espera(cond, ms = 4000) {
   page.on('console', (m) => { if (m.type() === 'error' && !esperado404(m)) errores.push(m.text()); });
   page.on('dialog', (d) => { errores.push(`alert() usado: ${d.message()}`); d.dismiss(); });
 
-  await page.goto(`${base}#/viajes`);
+  await abrirConEjemplo(page, base, '#/viajes'); // la app arranca vacía: se cargan los datos de prueba
   await page.waitForSelector('[data-lista] .item');
 
   // Validación: formulario vacío muestra errores junto a los campos, sin alert().
@@ -472,7 +473,7 @@ async function espera(cond, ms = 4000) {
   await page.waitForSelector('#f-aviso-licenciaDias');
   ok(await espera(async () => (await page.inputValue('#f-aviso-licenciaDias')) === '30, 15, 7'), 'restablecer vuelve a los valores de la configuración');
 
-  // Respaldo: exportar → borrar ejemplo → importar restaura.
+  // Respaldo: exportar → borrar los datos de prueba → importar restaura.
   const fotosAntes = await page.evaluate(async () => (await (await import('/src/data/store.js')).listarFotos()).length);
   const [resp] = await Promise.all([page.waitForEvent('download'), page.click('[data-exportar]')]);
   const rutaResp = await resp.path();
@@ -480,15 +481,11 @@ async function espera(cond, ms = 4000) {
   ok(respaldoJson.formato === 2 && respaldoJson.fotos.length === fotosAntes && fotosAntes >= 1, `el respaldo incluye las fotos (${respaldoJson.fotos.length})`);
   ok(respaldoJson.fotos.every((f) => /^data:image\/jpeg;base64,/.test(f.datos)), 'las fotos van en base64 (JPEG)');
   const totalAntes = (await leer(page, 'viajes')).length;
-  await page.click('[data-borrar-ejemplo]');
-  await page.click('dialog.modal [data-r="1"]');
+  await page.evaluate(async () => (await import('/tests/fixtures/ejemplo.js')).borrarDatosEjemplo());
   await espera(async () => (await leer(page, 'viajes')).every((v) => !v.ejemplo));
-  // Ajustes se repinta tras borrar (la pantalla queda vacía un instante): esperar a que la nueva ya esté
-  // completa —sin la sección de ejemplo y con el campo de importar— antes de actuar.
-  await espera(async () => (await page.locator('[data-borrar-ejemplo]').count()) === 0 && (await page.locator('#f-importar').count()) === 1);
   const quedan = await leer(page, 'viajes');
-  ok(quedan.length >= 1 && quedan.every((v) => !v.ejemplo), `datos de ejemplo borrados; quedan ${quedan.length} viaje(s) del usuario`);
-  ok(await espera(() => page.locator('#badge-ejemplo').isHidden()), 'franja "datos de ejemplo" desaparece');
+  ok(quedan.length >= 1 && quedan.every((v) => !v.ejemplo), `se borraron los datos de prueba; quedan ${quedan.length} viaje(s) creados por la prueba`);
+  ok((await page.locator('[data-borrar-ejemplo]').count()) === 0 && (await page.locator('#badge-ejemplo').count()) === 0, 'la app ya no tiene botón ni franja de "datos de ejemplo"');
   const campoViejo = await page.$('#f-importar');
   await page.setInputFiles('#f-importar', rutaResp);
   await page.click('dialog.modal [data-r="1"]');
@@ -586,6 +583,21 @@ async function espera(cond, ms = 4000) {
     ok(ceros.split(',').every((x) => Number(x) === 0) && ceros.split(',').length === 4, `con la base vacía las cuatro tarjetas están en 0 (${ceros})`);
     ok((await p3.locator('.graf__barra').count()) === 0 && (await p3.locator('.graf__col').count()) === 7, 'la gráfica muestra 7 días sin barras');
     ok((await p3.textContent('.section:last-of-type')).includes('No hay viajes programados hoy'), 'sin viajes: estado vacío con instrucción');
+    // La app arranca vacía: Inicio guía el orden (vehículos → choferes → rutas → viajes) y cada paso lleva a su pantalla.
+    ok((await p3.locator('[data-pasos] [data-paso]').count()) === 4 && (await p3.locator('[data-pasos] .paso--hecho').count()) === 0, 'Inicio vacío muestra los 4 primeros pasos, ninguno hecho');
+    ok((await p3.getAttribute('[data-paso="vehiculos"]', 'href')) === '#/vehiculos' && (await p3.getAttribute('[data-paso="rutas"]', 'href')) === '#/rutas', 'cada paso lleva a su pantalla');
+    ok((await p3.locator('.badge-ejemplo, #badge-ejemplo').count()) === 0 && (await p3.locator('.item').count()) === 0, 'sin datos inventados en ninguna parte');
+    ok(await p3.locator('#demo-note').isVisible(), 'sigue el aviso "Modo demostración: guardado solo en este dispositivo"');
+    // Al agregar un vehículo, un chofer y una ruta con horario, la guía desaparece sola.
+    await p3.evaluate(async () => {
+      const st = await import('/src/data/store.js');
+      await st.create('vehiculos', { placa: 'A123456', estado: 'disponible' });
+      await st.create('choferes', { nombre: 'Primer chofer' });
+      await st.create('rutas', { nombre: 'Ruta 1', origen: 'A', destino: 'B', duracionMin: 30, horarios: ['06:00'] });
+    });
+    await p3.reload();
+    await p3.waitForSelector('.graf svg');
+    ok(await espera(async () => (await p3.locator('[data-pasos]').count()) === 0), 'con vehículo, chofer y ruta con horario la guía de primeros pasos desaparece');
     await ctx3.close();
   }
 

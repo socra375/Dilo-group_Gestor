@@ -5,7 +5,7 @@
 Web app móvil para **un supervisor** de transporte de personal en República Dominicana: viajes y retrasos, choferes y asistencia, rutas con horarios fijos, vehículos (seguro y mantenimiento), combustible con rendimiento y reportes para compartir por WhatsApp. Funciona sin internet una vez instalada.
 
 - HTML + CSS + JavaScript (módulos ES). **Sin framework y sin build**: los archivos se publican tal cual. La única dependencia son las fuentes de Google.
-- Dos modos con la misma interfaz (`src/data/store.js`): **demostración** (datos de ejemplo en el teléfono, IndexedDB) y **nube** (Supabase: inicio de sesión, RLS y fotos en un bucket privado). Cuál corre lo decide un archivo: `src/config.local.js`.
+- Dos modos con la misma interfaz (`src/data/store.js`): **demostración** (sin cuenta; los datos quedan en el teléfono, IndexedDB) y **nube** (Supabase: inicio de sesión, RLS y fotos en un bucket privado). Cuál corre lo decide un archivo: `src/config.local.js`.
 - ⚠️ **Sin `src/config.local.js` la app está en modo demostración: no ingreses datos reales** (cédulas, direcciones, fotos de empleados). Los datos reales solo se permiten con el modo nube **ya desplegado y verificado** (sección *Supabase*, abajo). El código de la página y los datos de ejemplo son visibles para quien abra el enlace.
 - Software propietario: ver [LICENSE.md](LICENSE.md). Decisiones y supuestos por confirmar: [DECISIONES.md](DECISIONES.md).
 
@@ -17,7 +17,7 @@ Los módulos ES no cargan con `file://`; hace falta un servidor local:
 npm run serve          # http://localhost:8080  (o: python3 -m http.server 8080)
 ```
 
-Ábrelo con el modo "dispositivo móvil" del navegador (390 px). La primera vez se cargan los **datos de ejemplo** (con una franja visible); se borran de una vez en *Más → Ajustes*.
+Ábrelo con el modo "dispositivo móvil" del navegador (390 px). **La app arranca vacía**: no trae ningún dato inventado. Inicio muestra una guía de *Primeros pasos* (vehículos → choferes → rutas con horarios → viajes) que desaparece sola cuando ya hay un vehículo, un chofer y una ruta con horario. Las pruebas cargan sus propios datos desde `tests/fixtures/ejemplo.js`; eso no forma parte de la app.
 
 ## Pruebas
 
@@ -52,6 +52,15 @@ Todas las rutas son relativas y la navegación usa `#/pantalla`: no hay que conf
 
 > ⚠️ Mientras no exista la fase 8, los datos viven **solo en ese teléfono**. En iPhone, Safari puede borrar los datos de un sitio que no se abre en 7 días **si no está instalado**. Instálala y exporta un respaldo semanal (*Ajustes → Exportar respaldo*, incluye las fotos); Inicio avisa cuando toca.
 
+## Cambiar el logo
+
+1. Guarda la imagen del logo (idealmente con fondo blanco liso y sin bordes de captura de pantalla).
+2. `python3 scripts/logo.py ruta/al/logo.png` genera `icons/logo.png` y `icons/logo-marca.png` con fondo transparente (necesita `pip install pillow numpy`).
+3. `node scripts/iconos.cjs` regenera los íconos de la pantalla de inicio del teléfono.
+4. Sube `VERSION` en `sw.js` y publica. En el celular, el ícono de la pantalla de inicio puede tardar en actualizarse: hay que quitar la app y volver a instalarla.
+
+El logo va siempre sobre una pastilla blanca (es gris y ámbar; sobre el azul marino del encabezado no se leería).
+
 ## Cambiar un campo o un aviso desde config
 
 Qué está activo se decide en **`src/config.js`** (`CONFIG`); cómo es cada campo (tipo, etiqueta, validación), en `src/core/esquemas.js`. **Cambiar un campo es editar una línea:**
@@ -79,13 +88,12 @@ Los módulos futuros (sueldos, mantenimiento completo, servicios del vehículo, 
 index.html, manifest.webmanifest, sw.js, LICENSE.md, README.md, DECISIONES.md
 config.example.js         plantilla de src/config.local.js (activa el modo nube; ese archivo no se sube)
 supabase/001_tablas_y_seguridad.sql   tablas, RLS y bucket privado (se ejecuta una vez en Supabase)
-icons/                    íconos de la PWA (SVG fuente + PNG; `node scripts/iconos.cjs`)
-src/app.js                arranque: apariencia, migración de datos, datos de ejemplo, router, service worker
+icons/                    logo del cliente (`logo.png`, `logo-marca.png`) e íconos de la PWA (`python3 scripts/logo.py <imagen>` y luego `node scripts/iconos.cjs`)
+src/app.js                arranque: apariencia, migración de datos, router, service worker
 src/config.js             CONFIG del cliente: qué está activo
 src/data/store.js         capa de datos: list, get, create, update, archive, remove (+ fotos); IndexedDB o Supabase
 src/data/supabase.js      cliente mínimo de Supabase (Auth, PostgREST, Storage) con fetch, sin librerías
 src/core/entrar.js        pantalla de inicio de sesión (solo modo nube)
-src/data/seed.js          datos de ejemplo
 src/core/esquemas.js      campos de cada módulo (tipo, etiqueta, validación) y parámetros
 src/core/router.js        rutas por hash        src/core/ui.js      hoja inferior, confirmación, toasts
 src/core/form.js          formularios generados desde esquemas (fotos, horarios, motivos)
@@ -96,7 +104,7 @@ src/core/agregados.js     cálculos de reportes y CSV    src/core/share.js   Wha
 src/core/grafica.js       gráfica de barras en SVG      src/core/fotos.js   reducir y mostrar fotos
 src/modules/              una pantalla por archivo (+ extensiones/ reservadas)
 src/styles/               tokens, base, componentes, animaciones
-tests/                    pruebas unitarias (node --test)
+tests/                    pruebas unitarias (node --test) y tests/fixtures/ (datos de prueba para e2e y QA, no se publican)
 scripts/                  servidor local, QA, e2e (+ modo nube), Supabase falso, generador de íconos, generador de config.local.js para publicar
 .github/workflows/        ci.yml (pruebas en cada push) y pages.yml (publicación manual con Supabase)
 ```

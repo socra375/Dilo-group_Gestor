@@ -2,7 +2,7 @@
 // - Archivos propios: se sirven desde caché y se actualizan en segundo plano (la versión nueva llega en la siguiente apertura).
 // - Fuentes de Google: caché en tiempo de ejecución.
 // Al publicar cambios, sube VERSION para limpiar cachés viejas. tests/sw.test.js verifica que ARCHIVOS esté completo.
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `ct-app-${VERSION}`;
 const CACHE_FUENTES = 'ct-fuentes';
 
@@ -10,7 +10,8 @@ const ARCHIVOS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icons/icon.svg',
+  './icons/logo.png',
+  './icons/logo-marca.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
@@ -31,7 +32,6 @@ const ARCHIVOS = [
   './src/core/time.js',
   './src/core/ui.js',
   './src/core/entrar.js',
-  './src/data/seed.js',
   './src/data/store.js',
   './src/data/supabase.js',
   './src/modules/ajustes.js',

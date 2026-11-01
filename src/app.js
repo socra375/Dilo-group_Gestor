@@ -1,9 +1,8 @@
-// Arranque: apariencia, migración de datos, datos de ejemplo, enrutador y service worker.
+// Arranque: apariencia, migración de datos, enrutador y service worker.
 import { CONFIG } from './config.js';
 import { pref, setPref, letraPx } from './core/prefs.js';
 import { icon } from './core/ui.js';
-import { iniciarRouter, ir, refrescar } from './core/router.js';
-import { sembrarSiPrimeraVez, hayDatosEjemplo } from './data/seed.js';
+import { iniciarRouter, refrescar } from './core/router.js';
 import { pedirPersistencia, migrarDesdeLocalStorage, usarSupabase, restaurarSesion } from './data/store.js';
 import { pedirInicioSesion } from './core/entrar.js';
 
@@ -26,10 +25,6 @@ export function aplicarApariencia() {
   }
 }
 
-async function actualizarInsignia() {
-  document.getElementById('badge-ejemplo').hidden = !(await hayDatosEjemplo());
-}
-
 /** src/config.local.js (ignorado por git) activa Supabase. Sin ese archivo, la app corre en modo demostración. */
 async function cargarNube() {
   try {
@@ -42,7 +37,7 @@ async function cargarNube() {
 async function iniciar() {
   document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
   document.getElementById('brand-name').textContent = CONFIG.empresa.nombre;
-  // Altura real de la cabecera para los títulos de día "pegajosos" (cambia con la franja de ejemplo y la letra).
+  // Altura real de la cabecera para los títulos de día "pegajosos" (cambia con el tamaño de letra).
   const cabecera = document.querySelector('.app-header');
   new ResizeObserver(() => raiz.style.setProperty('--header-h', `${cabecera.offsetHeight}px`)).observe(cabecera);
   aplicarApariencia();
@@ -53,7 +48,6 @@ async function iniciar() {
   document.getElementById('tema-rapido').addEventListener('click', () => {
     setPref('tema', temaEfectivo() === 'oscuro' ? 'claro' : 'oscuro');
   });
-  document.getElementById('badge-ejemplo').addEventListener('click', () => ir('ajustes'));
   // El enlace "Saltar al contenido" no debe cambiar el hash (el hash es la ruta).
   document.querySelector('[data-saltar]').addEventListener('click', (e) => {
     e.preventDefault();
@@ -74,18 +68,10 @@ async function iniciar() {
   } else {
     try {
       await migrarDesdeLocalStorage();
-      await sembrarSiPrimeraVez();
     } catch (e) {
       console.error('No se pudieron preparar los datos', e);
     }
   }
-  await actualizarInsignia();
-  let pendiente = null;
-  window.addEventListener('datos', () => {
-    clearTimeout(pendiente);
-    pendiente = setTimeout(actualizarInsignia, 200);
-  });
-
   await iniciarRouter();
   pedirPersistencia();
 

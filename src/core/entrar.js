@@ -11,6 +11,7 @@ export function pedirInicioSesion() {
     document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
     document.getElementById('view').innerHTML = `
       <form class="login card" novalidate aria-labelledby="t-login">
+        <div class="logo-tile logo-tile--grande"><img src="icons/logo.png" alt="Dilo group" width="613" height="376"></div>
         <h2 id="t-login">Entrar a ${esc(CONFIG.empresa.nombre)}</h2>
         <p class="muted">Usa el correo y la contraseña que te dio el administrador.</p>
         <div class="field" data-campo="email"><label class="field__label" for="f-email">Correo</label>

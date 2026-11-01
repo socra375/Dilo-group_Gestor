@@ -17,7 +17,7 @@ function archivos(dir) {
 
 test('cada archivo de src/ e icons/ está precargado', () => {
   const faltan = [...archivos(join(raiz, 'src')), ...archivos(join(raiz, 'icons'))]
-    .filter((f) => /\.(js|css|png|svg)$/.test(f) && !f.includes('/extensiones/') && f !== 'icons/icon-maskable.svg') // fuente de los PNG
+    .filter((f) => /\.(js|css|png|svg)$/.test(f) && !f.includes('/extensiones/'))
     .filter((f) => !lista.includes(f));
   assert.deepEqual(faltan, []);
 });

@@ -1,10 +1,12 @@
-// Datos de ejemplo: se cargan una sola vez en el primer uso y llevan `ejemplo: true`.
-// Nombres, cédulas (000-…, no existen) y teléfonos (809-555-01xx, reservados para ficción) son inventados.
-import * as store from './store.js';
-import { CONFIG } from '../config.js';
-import { MOTIVOS_RETRASO } from '../core/esquemas.js';
-import { pref, setPref } from '../core/prefs.js';
-import { aISO, hoyClave, sumarDias, sumarMinutos, diaSemana } from '../core/time.js';
+// DATOS DE PRUEBA para el e2e y el QA. La app NO los trae: arranca vacía y el cliente carga lo suyo.
+// Las pruebas los cargan en el navegador con sembrar() (ver scripts/ayudas.cjs). Llevan `ejemplo: true` para distinguirlos
+// de lo que crea la propia prueba. Nombres, cédulas (000-…, no existen) y teléfonos (809-555-01xx, reservados para ficción)
+// son inventados.
+import * as store from '../../src/data/store.js';
+import { CONFIG } from '../../src/config.js';
+import { MOTIVOS_RETRASO } from '../../src/core/esquemas.js';
+import { setPref } from '../../src/core/prefs.js';
+import { aISO, hoyClave, sumarDias, sumarMinutos, diaSemana } from '../../src/core/time.js';
 
 // Generador pseudoaleatorio con semilla: los mismos datos en cada instalación.
 function azar(semilla) {
@@ -19,18 +21,6 @@ function azar(semilla) {
 }
 
 const PRECIO_GALON = { Gasoil: 235.1, Gasolina: 272.5 }; // SUPUESTO: precios de referencia para el ejemplo
-
-export async function sembrarSiPrimeraVez(ahora = new Date()) {
-  if (pref('sembrado')) return false;
-  const existentes = await Promise.all(store.COLECCIONES.map((c) => store.list(c, { archivados: 'todos' })));
-  if (existentes.some((l) => l.length)) {
-    setPref('sembrado', true);
-    return false;
-  }
-  await sembrar(ahora);
-  setPref('sembrado', true);
-  return true;
-}
 
 export async function sembrar(ahora = new Date()) {
   const r = azar(20261101);
@@ -172,28 +162,7 @@ export async function sembrar(ahora = new Date()) {
   await store.createMany('viajes', viajes);
   await store.createMany('combustible', combustible);
   await store.createMany('asistencia', asistencia);
-}
-
-export async function hayDatosEjemplo() {
-  for (const c of store.COLECCIONES) {
-    if ((await store.list(c, { archivados: 'todos' })).some((x) => x.ejemplo)) return true;
-  }
-  return false;
-}
-
-/** Cuenta registros reales que apuntan a datos de ejemplo (quedarán como "(eliminado)"). */
-export async function referenciasReales() {
-  const ids = new Set();
-  for (const c of ['choferes', 'rutas', 'vehiculos']) {
-    for (const x of await store.list(c, { archivados: 'todos' })) if (x.ejemplo) ids.add(x.id);
-  }
-  let n = 0;
-  for (const c of ['viajes', 'combustible', 'asistencia', 'choferes']) {
-    for (const x of await store.list(c, { archivados: 'todos' })) {
-      if (!x.ejemplo && [x.rutaId, x.choferId, x.vehiculoId].some((id) => ids.has(id))) n++;
-    }
-  }
-  return n;
+  setPref('ultimoRespaldo', ahora.toISOString()); // sin recordatorio de respaldo en los datos de prueba
 }
 
 export async function borrarDatosEjemplo() {

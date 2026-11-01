@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Dilo group">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -81,11 +81,11 @@
   <a class="sr-only skip-link" href="#main" data-saltar>Saltar al contenido</a>
 
   <header class="app-header">
+    <a class="logo-tile app-header__logo" href="#/inicio" aria-label="Dilo group, ir al inicio"><img src="icons/logo-marca.png" alt="" width="613" height="301"></a>
     <div class="app-header__titles">
       <p class="app-header__company" id="header-company">Dilo group</p>
       <h1 class="app-header__title" id="header-title">Inicio</h1>
     </div>
-    <button type="button" class="badge-ejemplo" id="badge-ejemplo" hidden><svg class="icon icon--sm" aria-hidden="true"><use href="#i-info"/></svg>Estás viendo datos de ejemplo · Borrar</button>
     <button type="button" class="icon-btn" id="tema-rapido" aria-label="Cambiar a tema oscuro"></button>
   </header>
 
@@ -96,7 +96,7 @@
   </main>
 
   <nav class="tabbar" aria-label="Principal">
-    <a class="tabbar__brand" href="#/inicio" data-brand><img src="icons/icon.svg" alt="" width="40" height="40"><span id="brand-name">Dilo group</span></a>
+    <a class="tabbar__brand" href="#/inicio" data-brand><span class="logo-tile tabbar__logo"><img src="icons/logo-marca.png" alt="" width="613" height="301"></span><span id="brand-name">Dilo group</span></a>
     <a href="#/inicio" data-tab="inicio"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg></span><span>Inicio</span></a>
     <a href="#/viajes" data-tab="viajes"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg></span><span>Viajes</span></a>
     <a href="#/choferes" data-tab="choferes"><span class="tabbar__pill"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg></span><span>Choferes</span></a>
