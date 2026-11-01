@@ -64,11 +64,13 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
   const base = url.replace(/\/+$/, '');
   let sesion = leerSesion();
 
-  const cabeceras = (extra = {}, conSesion = true) => ({
-    apikey: anonKey,
-    Authorization: `Bearer ${conSesion && sesion ? sesion.access_token : anonKey}`,
-    ...extra,
-  });
+  // La clave anon clásica es un JWT y puede ir también en Authorization. La clave nueva "sb_publishable_…" NO es un JWT:
+  // va solo en `apikey`; mandarla como Bearer haría que la API la rechace como "JWT inválido".
+  const esJwt = (k) => /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(k);
+  const cabeceras = (extra = {}, conSesion = true) => {
+    const token = conSesion && sesion ? sesion.access_token : esJwt(anonKey) ? anonKey : null;
+    return { apikey: anonKey, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
+  };
 
   const mensajeDe = async (r) => {
     let cuerpo = {};

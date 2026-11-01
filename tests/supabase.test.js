@@ -100,6 +100,25 @@ test('esUuid distingue UUID de los ids antiguos de la demo', () => {
   assert.ok(!esUuid('veh_1a2b3c') && !esUuid('') && !esUuid(null));
 });
 
+test('clave sb_publishable_: va solo en apikey (no es un JWT) y el flujo completo funciona; la anon clásica sí va como Bearer sin sesión', async () => {
+  const e = await entorno();
+  try {
+    const vistos = [];
+    const espia = (...a) => { vistos.push(a[1]?.headers ?? {}); return fetch(...a); };
+    const c = crearCliente({ url: e.servidor.url, anonKey: 'sb_publishable_abcdef123456' }, { fetchFn: espia });
+    await c.entrar('ana@dilo.test', 'clave-ana');
+    await c.datos.create('choferes', { nombre: 'X' });
+    assert.equal(vistos[0].Authorization, undefined, 'el login con clave publishable no manda Authorization');
+    assert.equal(vistos[0].apikey, 'sb_publishable_abcdef123456');
+    assert.match(vistos.at(-1).Authorization, /^Bearer acc\./, 'con sesión va el token del usuario, nunca la clave');
+    const jwtAnon = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.firma';
+    const vistos2 = [];
+    const c2 = crearCliente({ url: e.servidor.url, anonKey: jwtAnon }, { fetchFn: (...a) => { vistos2.push(a[1]?.headers ?? {}); return fetch(...a); } });
+    await c2.entrar('ana@dilo.test', 'clave-ana').catch(() => {});
+    assert.equal(vistos2[0].Authorization, `Bearer ${jwtAnon}`);
+  } finally { await e.servidor.cerrar(); }
+});
+
 // ---------- Auth ----------
 
 test('Auth: credenciales malas dan un mensaje en español; buenas guardan la sesión', async () => {
