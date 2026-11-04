@@ -9,6 +9,7 @@ const RUTAS = {
   viajes: () => import('../modules/viajes.js'),
   choferes: () => import('../modules/choferes.js'),
   combustible: () => import('../modules/combustible.js'),
+  'reporte-combustible': () => import('../modules/reporteCombustible.js'),
   mas: () => import('../modules/mas.js'),
   rutas: () => import('../modules/rutas.js'),
   vehiculos: () => import('../modules/vehiculos.js'),

@@ -19,6 +19,8 @@ const PANTALLAS = [
   ['rutas', '#/rutas'],
   ['vehiculos', '#/vehiculos'],
   ['combustible', '#/combustible'],
+  ['reporte-combustible', '#/reporte-combustible'],
+  ['reporte-combustible-mensual', '#/reporte-combustible', async (p) => { await p.click('[data-tipo="mes"]'); await p.waitForSelector('[data-carga]'); }],
   ['asistencia', '#/asistencia'],
   ['reportes', '#/reportes'],
   ['ajustes', '#/ajustes'],
@@ -111,7 +113,7 @@ async function accesibilidad(page) {
 }
 
 // Espera a que el router muestre la pantalla pedida (si no, se revisaría la anterior y daría un falso verde).
-const TITULOS = { '#/inicio': 'Dilo group', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/asistencia': 'Asistencia', '#/mas': 'Más' };
+const TITULOS = { '#/inicio': 'Dilo group', '#/viajes': 'Viajes', '#/choferes': 'Choferes', '#/rutas': 'Rutas', '#/vehiculos': 'Vehículos', '#/combustible': 'Combustible', '#/reporte-combustible': 'Reporte de combustible', '#/reportes': 'Reportes', '#/ajustes': 'Ajustes', '#/asistencia': 'Asistencia', '#/mas': 'Más' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = h; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);

@@ -4,7 +4,7 @@ import { CONFIG } from '../config.js';
 import { hoyClave, inicioSemana, horaAhora } from '../core/time.js';
 import { rendimientos, avisoCombustibleAlto, MOTIVOS_SIN_RENDIMIENTO } from '../core/avisos.js';
 import * as fmt from '../core/format.js';
-import { esc } from '../core/ui.js';
+import { esc, icon } from '../core/ui.js';
 
 // Se recalculan en `cabecera`, que corre con la lista completa antes de pintar cada fila.
 let rend = new Map();
@@ -35,7 +35,8 @@ export default pantallaCrud({
     const semana = resumen(cargas, inicioSemana(hoy));
     const mes = resumen(cargas, `${hoy.slice(0, 7)}-01`);
     const tile = (t, r) => `<div class="stat"><span class="stat__label">${t}</span><span class="stat__value stat__value--sm tabular">${fmt.cantidad(Math.round(r.cantidad * 10) / 10)}</span><span class="stat__note">${fmt.dinero(r.monto)} · ${fmt.plural(r.n, 'carga', 'cargas')}</span></div>`;
-    return `<div class="stats">${tile('Esta semana', semana)}${tile('Este mes', mes)}</div>`;
+    return `<div class="stats">${tile('Esta semana', semana)}${tile('Este mes', mes)}</div>
+      <a class="btn btn--secondary btn--block" href="#/reporte-combustible">${icon('file')}Reporte para el jefe</a>`;
   },
   describir(c, refs) {
     const veh = porId(refs.vehiculos).get(c.vehiculoId);

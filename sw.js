@@ -2,7 +2,7 @@
 // - Archivos propios: se sirven desde caché y se actualizan en segundo plano (la versión nueva llega en la siguiente apertura).
 // - Fuentes de Google: caché en tiempo de ejecución.
 // Al publicar cambios, sube VERSION para limpiar cachés viejas. tests/sw.test.js verifica que ARCHIVOS esté completo.
-const VERSION = 'v14';
+const VERSION = 'v15';
 const CACHE = `ct-app-${VERSION}`;
 const CACHE_FUENTES = 'ct-fuentes';
 
@@ -26,7 +26,10 @@ const ARCHIVOS = [
   './src/core/format.js',
   './src/core/fotos.js',
   './src/core/grafica.js',
+  './src/core/pdf.js',
+  './src/core/pdfCombustible.js',
   './src/core/prefs.js',
+  './src/core/reporteCombustible.js',
   './src/core/router.js',
   './src/core/share.js',
   './src/core/time.js',
@@ -40,6 +43,7 @@ const ARCHIVOS = [
   './src/modules/combustible.js',
   './src/modules/inicio.js',
   './src/modules/mas.js',
+  './src/modules/reporteCombustible.js',
   './src/modules/reportes.js',
   './src/modules/rutas.js',
   './src/modules/vehiculos.js',

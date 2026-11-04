@@ -27,7 +27,7 @@ export function enlaceWhatsApp(tel, texto = '') {
 // Texto limpio: líneas cortas, sin tablas ni columnas. WhatsApp pone en negrita lo que va entre *asteriscos*.
 
 import { CONFIG } from '../config.js';
-import { fecha as fechaTexto, fechaLarga, dinero, numero, unidad } from './format.js';
+import { fecha as fechaTexto, fechaLarga, dinero, numero, unidad, horaTexto } from './format.js';
 import { formatoDuracion } from './time.js';
 
 const MAX_LINEA = 110; // una línea más larga se corta con "…" para que no se rompa fea en el teléfono
@@ -43,10 +43,10 @@ function cantidadTexto(n) {
   return `${numero(v, v % 1 ? 1 : 0)} ${nombre}`;
 }
 
-function lista(items, vacio) {
+function lista(items, vacio, max = MAX_ITEMS) {
   if (!items.length) return [vacio];
-  const lineas = items.slice(0, MAX_ITEMS).map((t) => corta(`• ${t}`));
-  if (items.length > MAX_ITEMS) lineas.push(`• y ${items.length - MAX_ITEMS} más`);
+  const lineas = items.slice(0, max).map((t) => corta(`• ${t}`));
+  if (items.length > max) lineas.push(`• y ${items.length - max} más`);
   return lineas;
 }
 
@@ -104,6 +104,52 @@ export function combustibleVehiculoTexto({ titulo, periodo, filas }) {
     '',
     ...lista(filas.map((f) => `${f.placa}: ${cantidadTexto(f.galones)} · ${dinero(f.monto)}${f.kmGal != null ? ` · ${numero(f.kmGal, 1)} km/${unidad()}` : ''}`), 'Sin cargas en este periodo.'),
   ].join('\n');
+}
+
+/**
+ * Reporte de combustible (diario o mensual) con las cargas elegidas. `rep` viene de armarReporte().
+ * Diario: lista cada carga. Mensual: resumen por vehículo (las cargas van en el PDF y el CSV).
+ */
+export function reporteCombustibleTexto(rep) {
+  const t = rep.totales;
+  const hora = (f) => (f.hora ? `${horaTexto(f.hora)} · ` : '');
+  const detalle = rep.filas.map((f) => `${hora(f)}${f.placa}${f.chofer ? ` · ${f.chofer}` : ''} · ${cantidadTexto(f.cantidad)} · ${dinero(f.monto)}${f.estacion ? ` · ${f.estacion}` : ''}`);
+  const out = [
+    ...encabezado(rep.tipo === 'mes' ? 'Combustible del mes' : 'Combustible del día', rep.periodoTexto),
+    t.cargas ? `*Total:* ${cantidadTexto(t.cantidad)} · ${dinero(t.monto)} (${plural(t.cargas, 'carga', 'cargas')})` : '*Total:* sin cargas',
+  ];
+  if (t.precio != null) out.push(`*Precio promedio:* ${dinero(t.precio)} por ${unidad()}`);
+  if (rep.tipo === 'dia' && t.cargas) out.push('', '*Facturas*', ...lista(detalle, 'Sin cargas.', 15));
+  // En el diario, el resumen por vehículo solo aporta si algún vehículo cargó más de una vez (si no, repite la lista).
+  if (rep.tipo === 'mes' ? rep.porVehiculo.length > 0 : rep.porVehiculo.some((g) => g.cargas > 1)) {
+    out.push('', '*Por vehículo*', ...lista(rep.porVehiculo.map((g) => `${g.placa}: ${cantidadTexto(g.cantidad)} · ${dinero(g.monto)} (${plural(g.cargas, 'carga', 'cargas')})`), '', 12));
+  }
+  if (t.conFoto) out.push('', `Facturas con foto: ${t.conFoto} de ${t.cargas}`);
+  return out.join('\n');
+}
+
+/**
+ * Envía el reporte por WhatsApp. Con la hoja de compartir del sistema y soporte de archivos, comparte el PDF junto con
+ * el texto (la persona elige el chat). Si el navegador no puede adjuntar archivos, abre WhatsApp con el texto (al número
+ * del jefe si se indicó). Devuelve 'pdf' | 'texto' | 'cancelado'.
+ */
+export async function compartirReporteWhatsApp({ texto, archivo = null, numero = '', titulo = '' }) {
+  if (archivo && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && navigator.canShare?.({ files: [archivo] })) {
+    try {
+      await navigator.share({ files: [archivo], text: texto, title: titulo || archivo.name });
+      return 'pdf';
+    } catch (e) {
+      if (e?.name === 'AbortError') return 'cancelado';
+      // Otro fallo: se intenta con solo el texto.
+    }
+  }
+  const directo = numero ? enlaceWhatsApp(numero, texto) : null;
+  if (directo) {
+    window.open(directo, '_blank', 'noopener');
+    return 'texto';
+  }
+  const r = await compartirWhatsApp(texto);
+  return r === 'cancelado' ? 'cancelado' : 'texto';
 }
 
 /** Enlace de respaldo cuando el navegador no tiene la hoja de compartir. */

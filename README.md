@@ -35,6 +35,17 @@ npm i --no-save playwright axe-core && npx playwright install chromium
 
 Las tres corren en **GitHub Actions** en cada push (`.github/workflows/ci.yml`); las capturas quedan como artefacto. Un cambio se fusiona a `main` solo con las tres en verde (ver `CLAUDE.md`).
 
+## Reporte de combustible para el jefe
+
+*Combustible → Reporte para el jefe.* Pensado para mandar todos los días (o cada mes) por WhatsApp:
+
+1. **Diario o mensual**, y la fecha o el mes.
+2. **Elige las facturas** (cargas) que irán: por defecto van todas; se pueden quitar una a una o todas a la vez. Los totales y el mensaje se recalculan al instante.
+3. **Enviar por WhatsApp**: con la hoja de compartir del teléfono se manda el **PDF** (con las fotos de las facturas, si se marca) junto con un texto resumen, y tú eliges el chat. Si el navegador no permite adjuntar archivos, abre WhatsApp con el texto (directo al chat del jefe si guardaste su número) y avisa que el PDF se adjunta a mano.
+4. **Descargar**: PDF o Excel (CSV).
+
+El PDF lleva encabezado con la empresa, totales, tabla de cargas, resumen por vehículo y las fotos. El número del jefe es opcional y se recuerda solo en ese teléfono. Los cálculos están en `src/core/reporteCombustible.js`, el texto en `src/core/share.js` y el PDF (sin librerías) en `src/core/pdf.js` y `src/core/pdfCombustible.js`.
+
 ## Publicar en Vercel (recomendado)
 
 Vercel importa el repositorio directo desde GitHub: **sin tokens ni flujos**. Cada fusión a `main` se publica sola y cada rama genera una vista previa. `vercel.json` ya dice cómo construir (`bash scripts/armar-sitio.sh public`) y trae las cabeceras de caché y seguridad.
@@ -116,6 +127,7 @@ src/core/crud.js          lista/buscar/crear/editar/archivar genérico
 src/core/time.js          zona horaria, medianoche, estado y retraso de viajes, generar viajes
 src/core/avisos.js        los 5 avisos y el rendimiento km/gal
 src/core/agregados.js     cálculos de reportes y CSV    src/core/share.js   WhatsApp y llamadas
+src/core/pdf.js           generador de PDF mínimo       src/core/reporteCombustible.js  reporte para el jefe
 src/core/grafica.js       gráfica de barras en SVG      src/core/fotos.js   reducir y mostrar fotos
 src/modules/              una pantalla por archivo (+ extensiones/ reservadas)
 src/styles/               tokens, base, componentes, animaciones

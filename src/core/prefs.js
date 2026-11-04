@@ -10,6 +10,7 @@ const porDefecto = () => ({
   letra: CONFIG.tema.letra, // 'normal' | 'grande' | 'extra'
   toleranciaMin: CONFIG.viajes.tolerancia_min,
   ultimoRespaldo: null,
+  jefeWhatsapp: '', // 10 dígitos; opcional (reporte de combustible)
 });
 
 let actual = null;

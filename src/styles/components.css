@@ -1023,3 +1023,11 @@ body.modo-nube .demo-note { display: none !important; }
   .view--ancha [data-lista] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); align-items: start; }
   .view--ancha [data-lista] > li:only-child { grid-column: 1 / -1; } /* estado vacío: ocupa todo el ancho */
 }
+
+/* ---------- Reporte de combustible: elegir facturas ---------- */
+.seleccion { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 56px; cursor: pointer; }
+.seleccion input[type='checkbox'], .check input[type='checkbox'] { flex: none; width: 24px; height: 24px; accent-color: var(--c-primary); cursor: pointer; }
+.check { display: flex; align-items: center; gap: var(--sp-3); min-height: 44px; cursor: pointer; }
+.check:has(input:disabled) { cursor: default; color: var(--c-text-muted); }
+.item:has(.seleccion:focus-within) { border-color: var(--c-focus); }
+.avatar--recibo { width: 48px; height: 56px; border-radius: var(--r-sm); background: var(--c-surface-2); }

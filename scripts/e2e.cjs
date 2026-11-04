@@ -15,7 +15,7 @@ const ok = (cond, msg) => {
 // Reintenta una condición hasta `ms`: la lista se repinta de forma asíncrona tras guardar.
 // Navega y espera a que el router muestre la pantalla NUEVA (título incluido): si no, la prueba puede
 // leer la lista de la pantalla anterior, que sigue visible un instante.
-const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', asistencia: 'Asistencia', inicio: 'Dilo group' };
+const TITULOS = { choferes: 'Choferes', vehiculos: 'Vehículos', rutas: 'Rutas', reportes: 'Reportes', ajustes: 'Ajustes', viajes: 'Viajes', combustible: 'Combustible', 'reporte-combustible': 'Reporte de combustible', asistencia: 'Asistencia', inicio: 'Dilo group' };
 async function ir(page, ruta) {
   await page.evaluate((h) => { location.hash = `#/${h}`; }, ruta);
   await page.waitForFunction((t) => document.getElementById('header-title')?.textContent === t, TITULOS[ruta]);
@@ -464,10 +464,17 @@ async function espera(cond, ms = 4000) {
   ok((await page.inputValue('#f-aviso-licenciaDias')) === '7, 3', 'el umbral válido se ordena y se guarda (7, 3)');
   await ir(page, 'inicio');
   await page.waitForSelector('.graf svg');
-  await page.click('[data-ver-avisos]');
-  ok(!(await page.textContent('dialog.sheet[open]')).includes('Licencia vence en 10 días'), 'con umbral de 7 días, la licencia que vence en 10 ya no avisa');
-  await page.keyboard.press('Escape');
-  await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  // Si quedan 3 avisos o menos, Inicio los muestra todos y no hay botón "Ver todos" (depende de cuántos viajes estén retrasados a esa hora).
+  let textoAvisos;
+  if ((await page.locator('[data-ver-avisos]').count()) > 0) {
+    await page.click('[data-ver-avisos]');
+    textoAvisos = await page.textContent('dialog.sheet[open]');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('dialog.sheet', { state: 'detached' });
+  } else {
+    textoAvisos = await page.textContent('[data-avisos]');
+  }
+  ok(!textoAvisos.includes('Licencia vence en 10 días'), 'con umbral de 7 días, la licencia que vence en 10 ya no avisa');
   await ir(page, 'ajustes');
   await page.click('[data-restablecer-avisos]');
   await page.waitForSelector('#f-aviso-licenciaDias');
@@ -617,6 +624,112 @@ async function espera(cond, ms = 4000) {
     ok(choferes.length === 1 && choferes[0].nombre === 'Chofer de la versión anterior', 'datos de localStorage migrados a IndexedDB');
     ok((await p2.evaluate(() => localStorage.getItem('ct:v1:choferes'))) === null, 'claves viejas de localStorage borradas');
     await ctx2.close();
+  }
+
+  // Reporte de combustible para el jefe: elegir periodo y facturas; enviar por WhatsApp o descargar (PDF / CSV).
+  {
+    await ir(page, 'combustible');
+    await page.click('a[href="#/reporte-combustible"]');
+    await page.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Reporte de combustible');
+    await page.waitForSelector('[data-carga]');
+    const esperadas = await page.evaluate(async () => {
+      const st = await import('/src/data/store.js');
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santo_Domingo' }).format(new Date());
+      const todas = (await st.list('combustible')).filter((c) => !c.archivado);
+      return { dia: todas.filter((c) => c.fecha === hoy).length, mes: todas.filter((c) => c.fecha.slice(0, 7) === hoy.slice(0, 7)).length, hoy };
+    });
+    const nCargas = () => page.locator('[data-carga]').count();
+    ok(esperadas.dia >= 1 && (await nCargas()) === esperadas.dia, `diario: lista las ${esperadas.dia} carga(s) de hoy, todas marcadas`);
+    ok((await page.locator('[data-carga]:checked').count()) === esperadas.dia, 'por defecto van todas las facturas');
+
+    await page.click('[data-tipo="mes"]');
+    ok(await espera(async () => (await nCargas()) === esperadas.mes), `mensual: lista las ${esperadas.mes} cargas del mes`);
+    const cargasStat = () => page.evaluate(() => Number(document.querySelector('[data-resumen] .stat__value')?.textContent));
+    ok((await cargasStat()) === esperadas.mes, 'el resumen cuenta todas las cargas');
+
+    // Quitar una factura: el resumen y el mensaje cambian.
+    const msgAntes = await page.textContent('[data-mensaje]');
+    await page.locator('[data-carga]').first().uncheck();
+    ok(await espera(async () => (await cargasStat()) === esperadas.mes - 1), 'al quitar una factura el resumen baja en una carga');
+    ok((await page.textContent('[data-conteo]')).includes(`${esperadas.mes - 1} de ${esperadas.mes}`), 'el conteo dice cuántas van elegidas');
+    ok((await page.textContent('[data-mensaje]')) !== msgAntes, 'el mensaje de WhatsApp cambia con la selección');
+
+    // Con una factura quitada el botón dice "Marcar todas"; con todas marcadas, "Quitar todas". Sin ninguna elegida no se envía.
+    ok((await page.textContent('[data-todas]')) === 'Marcar todas', 'con una factura quitada, el botón ofrece "Marcar todas"');
+    await page.click('[data-todas]');
+    ok(await espera(async () => (await cargasStat()) === esperadas.mes && (await page.textContent('[data-todas]')) === 'Quitar todas'), '"Marcar todas" las elige todas');
+    await page.click('[data-todas]');
+    ok(await espera(async () => (await page.locator('[data-enviar]').isDisabled()) && (await page.locator('[data-pdf]').isDisabled()) && (await page.locator('[data-csv]').isDisabled())), 'sin facturas elegidas no se puede enviar ni descargar');
+    await page.click('[data-todas]');
+    ok(await espera(async () => (await cargasStat()) === esperadas.mes && !(await page.locator('[data-enviar]').isDisabled())), 'marcar todas lo reactiva');
+
+    // Descargas: PDF y CSV con el nombre y el contenido esperados.
+    const mesClave = esperadas.hoy.slice(0, 7);
+    const [dPdf] = await Promise.all([page.waitForEvent('download'), page.click('[data-pdf]')]);
+    ok(dPdf.suggestedFilename() === `combustible-mensual-${mesClave}.pdf`, `PDF mensual descargado: ${dPdf.suggestedFilename()}`);
+    const pdf = require('fs').readFileSync(await dPdf.path()).toString('latin1');
+    ok(pdf.startsWith('%PDF-1.4') && pdf.includes('Reporte mensual de combustible') && pdf.trimEnd().endsWith('%%EOF'), 'el archivo es un PDF con el título del reporte');
+    const [dCsv] = await Promise.all([page.waitForEvent('download'), page.click('[data-csv]')]);
+    ok(dCsv.suggestedFilename() === `combustible-mensual-${mesClave}.csv`, `CSV mensual descargado: ${dCsv.suggestedFilename()}`);
+    const csv = require('fs').readFileSync(await dCsv.path(), 'utf8');
+    ok(csv.includes('TOTAL') && csv.split('\r\n').filter(Boolean).length === esperadas.mes + 2, 'el CSV trae una fila por carga más encabezado y total');
+
+    // Una factura con foto real (JPEG) entra al PDF.
+    await page.evaluate(async () => {
+      const st = await import('/src/data/store.js');
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santo_Domingo' }).format(new Date());
+      const lienzo = document.createElement('canvas');
+      lienzo.width = 200; lienzo.height = 300;
+      const cx = lienzo.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, 200, 300); cx.fillStyle = '#12334a'; cx.fillRect(20, 20, 160, 40);
+      const blob = await new Promise((r) => lienzo.toBlob(r, 'image/jpeg', 0.7));
+      const id = await st.guardarFoto(blob);
+      const carga = (await st.list('combustible')).find((c) => c.fecha === hoy);
+      await st.update('combustible', carga.id, { fotoId: id });
+    });
+    await page.reload();
+    await page.waitForSelector('[data-carga]');
+    ok(await espera(async () => (await page.locator('[data-lista] .avatar--recibo img').count()) >= 1), 'la lista muestra la miniatura de la factura con foto');
+    ok(!(await page.locator('[data-fotos]').isDisabled()), 'con una factura con foto se puede incluir las fotos');
+    const [dPdf2] = await Promise.all([page.waitForEvent('download'), page.click('[data-pdf]')]);
+    const pdfFoto = require('fs').readFileSync(await dPdf2.path()).toString('latin1');
+    ok(pdfFoto.includes('/DCTDecode') && pdfFoto.includes('/Subtype /Image'), 'el PDF incluye la foto de la factura');
+    await page.uncheck('[data-fotos]');
+    const [dPdf3] = await Promise.all([page.waitForEvent('download'), page.click('[data-pdf]')]);
+    ok(!require('fs').readFileSync(await dPdf3.path()).toString('latin1').includes('/DCTDecode'), 'sin marcar "incluir fotos" el PDF no lleva imágenes');
+    await page.check('[data-fotos]');
+
+    // WhatsApp con la hoja de compartir (se simula): comparte el PDF junto con el texto.
+    await page.evaluate(() => {
+      window.__comp = null;
+      navigator.canShare = () => true;
+      navigator.share = async (d) => { window.__comp = { archivos: (d.files || []).map((f) => ({ nombre: f.name, tipo: f.type, tam: f.size })), texto: d.text }; };
+    });
+    await page.click('[data-enviar]');
+    ok(await espera(() => page.evaluate(() => window.__comp !== null)), 'enviar por WhatsApp abre la hoja de compartir');
+    const comp = await page.evaluate(() => window.__comp);
+    ok(comp.archivos.length === 1 && comp.archivos[0].tipo === 'application/pdf' && comp.archivos[0].nombre.endsWith('.pdf') && comp.archivos[0].tam > 1000, `comparte el PDF adjunto (${comp.archivos[0]?.nombre}, ${comp.archivos[0]?.tam} bytes)`);
+    ok(comp.texto.includes('Combustible del día') && comp.texto.includes('*Total:*'), 'y el texto del reporte (al recargar, vuelve a Diario)');
+
+    // Sin soporte de archivos: abre WhatsApp con el texto, directo al chat del jefe si se indicó su número.
+    await page.fill('[data-jefe]', '809-555-0100');
+    await page.dispatchEvent('[data-jefe]', 'change');
+    ok((await page.evaluate(() => JSON.parse(localStorage.getItem('ct:prefs')).jefeWhatsapp)) === '8095550100', 'el número del jefe se recuerda en el teléfono');
+    await page.fill('[data-jefe]', '12345');
+    await page.dispatchEvent('[data-jefe]', 'change');
+    ok((await page.textContent('#jefe-err')).includes('10 dígitos'), 'un número inválido muestra el error junto al campo');
+    await page.fill('[data-jefe]', '809-555-0100');
+    await page.dispatchEvent('[data-jefe]', 'change');
+    await page.evaluate(() => {
+      navigator.canShare = undefined;
+      navigator.share = undefined;
+      window.__abierto = null;
+      window.open = (u) => { window.__abierto = u; return null; };
+    });
+    await page.click('[data-enviar]');
+    ok(await espera(() => page.evaluate(() => window.__abierto !== null)), 'sin hoja de compartir se abre WhatsApp');
+    const abierto = await page.evaluate(() => window.__abierto);
+    ok(abierto.startsWith('https://wa.me/18095550100?text=') && decodeURIComponent(abierto).includes('Combustible del día'), 'al chat del jefe, con el texto ya escrito');
+    ok((await page.textContent('#toasts')).includes('no permite adjuntar el PDF'), 'y avisa que el PDF hay que adjuntarlo a mano');
   }
 
   // Actualización: cuando se publica una versión nueva, el service worker nuevo toma el control y la página se recarga
