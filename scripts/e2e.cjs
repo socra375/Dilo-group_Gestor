@@ -732,6 +732,44 @@ async function espera(cond, ms = 4000) {
     ok((await page.textContent('#toasts')).includes('no permite adjuntar el PDF'), 'y avisa que el PDF hay que adjuntarlo a mano');
   }
 
+  // Movimiento (sin "reducir movimiento"): tarjetas que entran escalonadas, indicador que se desliza y onda al cambiar de tema.
+  {
+    const ctxM = await navegador.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'America/Santo_Domingo' });
+    const pM = await ctxM.newPage();
+    pM.setDefaultTimeout(8000);
+    const erroresM = [];
+    pM.on('pageerror', (e) => erroresM.push(e.message));
+    await abrirConEjemplo(pM, base, '#/inicio');
+    await pM.waitForSelector('.view--bento.entra');
+    const entrada = await pM.evaluate(() => {
+      const hijos = [...document.querySelector('.view--bento').children];
+      return { indices: hijos.slice(0, 4).map((c) => c.style.getPropertyValue('--i')), nombre: getComputedStyle(hijos[2]).animationName, retraso: getComputedStyle(hijos[2]).animationDelay };
+    });
+    ok(entrada.indices.join(',') === '0,1,2,3' && entrada.nombre === 'tarjeta-in' && parseFloat(entrada.retraso) > 0, `las tarjetas de Inicio entran escalonadas (${entrada.indices.join(',')}, retraso ${entrada.retraso})`);
+
+    // Indicador deslizante del selector Diario / Mensual.
+    await pM.evaluate(() => { location.hash = '#/reporte-combustible'; });
+    await pM.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Reporte de combustible');
+    await pM.waitForSelector('.segmented[data-pill]');
+    const xAntes = await pM.evaluate(() => document.querySelector('.segmented').style.getPropertyValue('--pill-x'));
+    await pM.click('[data-tipo="mes"]');
+    ok(await espera(async () => (await pM.evaluate(() => document.querySelector('.segmented').style.getPropertyValue('--pill-x'))) !== xAntes), 'al elegir otra opción el indicador cambia de lugar');
+    const trans = await pM.evaluate(() => getComputedStyle(document.querySelector('.segmented'), '::before').transitionDuration);
+    ok(trans.includes('0.28s'), `y se desliza en vez de saltar (${trans})`);
+    ok((await pM.evaluate(() => getComputedStyle(document.querySelector('[data-tipo="mes"]')).backgroundColor)) === 'rgba(0, 0, 0, 0)', 'la opción elegida no pinta su propio fondo (lo pone el indicador)');
+
+    // Cambio de tema con onda circular desde el botón.
+    ok((await pM.evaluate(() => document.documentElement.dataset.theme)) === 'claro', 'empieza en tema claro');
+    await pM.click('#tema-rapido');
+    const hubo = await espera(() => pM.evaluate(() => document.getAnimations().some((a) => String(a.effect?.pseudoElement || '').includes('view-transition'))), 1500);
+    ok(hubo, 'al cambiar de tema se dibuja la onda circular (View Transition)');
+    ok(await espera(async () => (await pM.evaluate(() => document.documentElement.dataset.theme)) === 'oscuro'), 'y el tema pasa a oscuro');
+    await pM.click('#tema-rapido');
+    ok(await espera(async () => (await pM.evaluate(() => document.documentElement.dataset.theme)) === 'claro'), 'y vuelve a claro');
+    ok(!erroresM.length, `sin errores durante el movimiento${erroresM.length ? `: ${erroresM.join(' | ')}` : ''}`);
+    await ctxM.close();
+  }
+
   // Actualización: cuando se publica una versión nueva, el service worker nuevo toma el control y la página se recarga
   // sola UNA vez (antes se seguía viendo la copia vieja hasta recargar a mano). Si alguien está escribiendo, espera.
   {

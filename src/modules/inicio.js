@@ -11,8 +11,7 @@ import { graficaRetrasosHTML, activarGrafica } from '../core/grafica.js';
 import * as fmt from '../core/format.js';
 import { esc, icon, vacio, animarContador, escalonar, conCarga, abrirHoja } from '../core/ui.js';
 import { tarjetaViaje, refsViajes, abrirRegistro, abrirViaje } from './viajes.js';
-
-let contadoresAnimados = false; // los totales cuentan de 0 al valor una sola vez por sesión
+import { escalonarHijos } from '../core/movimiento.js';
 
 const cap = (t) => t.replace(/^./, (c) => c.toUpperCase());
 
@@ -149,8 +148,8 @@ export default {
       </div>`;
 
       activarGrafica(cuerpo, d.retrasosDia);
-      if (animar && !contadoresAnimados) {
-        contadoresAnimados = true;
+      if (animar) {
+        escalonarHijos(cuerpo.firstElementChild); // las tarjetas de Inicio entran una tras otra
         for (const id of ['viajes', 'retrasos', 'combustible', 'choferes']) {
           const n = cuerpo.querySelector(`[data-contador="${id}"]`);
           const dec = d.totales[id].decimales || 0;

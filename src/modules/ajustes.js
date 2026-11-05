@@ -5,6 +5,7 @@ import { pref, setPref, avisosConfig } from '../core/prefs.js';
 import { hoyClave, fechaClave } from '../core/time.js';
 import * as fmt from '../core/format.js';
 import { esc, icon, toast, confirmar, descargar } from '../core/ui.js';
+import { conOnda } from '../core/movimiento.js';
 import { refrescar } from '../core/router.js';
 
 const FORMATO = 2; // 2: incluye las fotos (en base64). Los respaldos de formato 1 (sin fotos) se siguen pudiendo importar.
@@ -166,7 +167,10 @@ export default {
         ${instalada ? '' : `<div class="alert alert--info">${icon('info')}<span class="alert__body"><span class="alert__title">Instálala en la pantalla de inicio</span><span class="alert__text">iPhone: Compartir → “Agregar a inicio”. Android: menú ⋮ → “Instalar app”. Así funciona sin internet y el navegador no borra los datos.</span></span></div>`}
       </section>`;
 
-    el.querySelector('#f-oscuro').addEventListener('change', (e) => setPref('tema', e.target.checked ? 'oscuro' : 'claro'));
+    el.querySelector('#f-oscuro').addEventListener('change', (e) => {
+      const r = e.target.getBoundingClientRect();
+      conOnda(() => setPref('tema', e.target.checked ? 'oscuro' : 'claro'), r.left + r.width / 2, r.top + r.height / 2);
+    });
     // El botón rápido del encabezado también cambia el tema: mantener el interruptor al día.
     const alCambiarPref = (e) => {
       if (e.detail.clave === 'tema') el.querySelector('#f-oscuro').checked = e.detail.valor === 'oscuro';

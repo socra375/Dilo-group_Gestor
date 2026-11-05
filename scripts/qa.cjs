@@ -360,7 +360,8 @@ let fallos = 0;
     const m = await page.evaluate(() => {
       const seg = (el) => parseFloat(getComputedStyle(el).animationDuration) * (getComputedStyle(el).animationDuration.endsWith('ms') ? 0.001 : 1);
       const vista = document.querySelector('.view');
-      return { vista: seg(vista), nombre: getComputedStyle(vista).animationName };
+      const hijo = vista.children[2]; // las tarjetas entran escalonadas (movimiento.js), salvo con reducir movimiento
+      return { vista: seg(vista), nombre: getComputedStyle(vista).animationName, hijo: getComputedStyle(hijo).animationName };
     });
     const ok = reducir ? m.vista <= 0.002 : m.vista >= 0.15 && m.vista <= 0.25 && m.nombre.includes('view-in');
     console.log(`${ok ? '✓' : '✗'} movimiento ${reducir ? 'reducido: sin animación' : 'normal: cambio de pantalla de 160–200 ms'} (${m.nombre}, ${(m.vista * 1000).toFixed(0)} ms)`);

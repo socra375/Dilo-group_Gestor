@@ -3,6 +3,7 @@
 import { CONFIG } from '../config.js';
 import { EXTENSIONES } from './esquemas.js';
 import { reduceMotion, esc } from './ui.js';
+import { escalonarHijos } from './movimiento.js';
 
 const RUTAS = {
   inicio: () => import('../modules/inicio.js'),
@@ -91,7 +92,10 @@ async function mostrar(animar = true) {
   }
   if (yo !== turno) return;
   if (typeof r === 'function') limpiar = r;
-  if (animar && !reduceMotion()) nueva.classList.add('view--enter');
+  if (animar && !reduceMotion()) {
+    nueva.classList.add('view--enter');
+    escalonarHijos(nueva);
+  }
   if (animar) {
     window.scrollTo(0, 0);
     document.getElementById('main').focus({ preventScroll: true });

@@ -44,7 +44,35 @@
   to { transform: scaleX(1); }
 }
 
+@keyframes tarjeta-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes punto-in {
+  from { left: 0%; }
+}
+@keyframes pastilla-in {
+  from { opacity: 0.35; transform: scale(0.7); }
+  to { opacity: 1; transform: none; }
+}
+
 .view--enter { animation: view-in var(--dur) var(--ease-out) both; }
+
+/* Las tarjetas de cada pantalla entran una tras otra (movimiento.js pone --i en cada una). */
+.entra > * {
+  animation: tarjeta-in 300ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 36ms);
+}
+
+/* Barras y trayectos se dibujan al entrar. */
+.stat__barra > span, .timeline__line::before { transform-origin: left; animation: bar-grow 650ms var(--ease-out) 180ms both; }
+.timeline__line::after { animation: punto-in 650ms var(--ease-out) 180ms both; }
+.tabbar a[aria-current='page'] .tabbar__pill { animation: pastilla-in 260ms var(--ease-out); }
+
+/* Cambio de tema: la página nueva se revela con una onda circular (la dibuja movimiento.js); sin fundido por defecto. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
 
 .stagger > * {
   animation: item-in 220ms var(--ease-out) both;

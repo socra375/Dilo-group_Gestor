@@ -5,6 +5,7 @@ import { icon } from './core/ui.js';
 import { iniciarRouter, refrescar } from './core/router.js';
 import { pedirPersistencia, migrarDesdeLocalStorage, usarSupabase, restaurarSesion } from './data/store.js';
 import { pedirInicioSesion } from './core/entrar.js';
+import { conOnda, iniciarPildoras } from './core/movimiento.js';
 
 const raiz = document.documentElement;
 
@@ -46,9 +47,11 @@ async function iniciar() {
     if (['tema', 'letra'].includes(e.detail.clave)) aplicarApariencia();
   });
 
-  document.getElementById('tema-rapido').addEventListener('click', () => {
-    setPref('tema', temaEfectivo() === 'oscuro' ? 'claro' : 'oscuro');
+  document.getElementById('tema-rapido').addEventListener('click', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    conOnda(() => setPref('tema', temaEfectivo() === 'oscuro' ? 'claro' : 'oscuro'), r.left + r.width / 2, r.top + r.height / 2);
   });
+  iniciarPildoras();
   // El enlace "Saltar al contenido" no debe cambiar el hash (el hash es la ruta).
   document.querySelector('[data-saltar]').addEventListener('click', (e) => {
     e.preventDefault();

@@ -1078,3 +1078,22 @@ body.modo-nube .demo-note { display: none !important; }
   .acceso__lista li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.65em; border-radius: 50%; background: var(--c-accent); vertical-align: 0.15em; }
   .login { align-content: center; padding: var(--sp-6); border: 0; border-radius: 0; box-shadow: none; }
 }
+
+/* ---------- Indicador deslizante de los selectores segmentados (movimiento.js) ---------- */
+.segmented { position: relative; isolation: isolate; }
+.segmented button { position: relative; z-index: 1; }
+.segmented[data-pill]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: var(--pill-w);
+  height: var(--pill-h);
+  transform: translate(var(--pill-x), var(--pill-y));
+  border-radius: calc(var(--r-md) - 4px);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-1);
+  transition: transform 280ms var(--ease-out), width 280ms var(--ease-out), height 280ms var(--ease-out);
+}
+.segmented[data-pill] button[aria-pressed='true'] { background: transparent; box-shadow: none; }
