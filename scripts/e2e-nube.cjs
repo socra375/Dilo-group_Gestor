@@ -87,6 +87,14 @@ const titulo = (page) => page.evaluate(() => document.getElementById('header-tit
   await pa.waitForFunction(() => document.getElementById('login-err')?.textContent);
   ok((await pa.textContent('#login-err')).includes('Correo o contraseña incorrectos'), 'contraseña mala: mensaje claro y sin entrar');
   ok((await pa.inputValue('#f-password')) === '', 'la contraseña se limpia tras el fallo');
+  // Mostrar / ocultar la contraseña (al escribirla en el teléfono se falla menos).
+  await pa.fill('#f-password', 'secreta');
+  ok((await pa.getAttribute('#f-password', 'type')) === 'password', 'la contraseña empieza oculta');
+  await pa.click('[data-ver-clave]');
+  ok((await pa.getAttribute('#f-password', 'type')) === 'text' && (await pa.textContent('[data-ver-clave]')) === 'Ocultar' && (await pa.getAttribute('[data-ver-clave]', 'aria-label')) === 'Ocultar la contraseña', '"Mostrar" la deja visible y el botón pasa a "Ocultar"');
+  await pa.click('[data-ver-clave]');
+  ok((await pa.getAttribute('#f-password', 'type')) === 'password' && (await pa.inputValue('#f-password')) === 'secreta', 'y vuelve a ocultarla sin perder lo escrito');
+  await pa.fill('#f-password', '');
 
   // Entrar bien
   await entrar(pa, 'ana@dilo.test', 'clave-ana');

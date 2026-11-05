@@ -946,7 +946,7 @@ dialog::backdrop { background: var(--scrim); }
 .stats--resumen > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 /* ---------- Inicio de sesión (Supabase) ---------- */
-.login { display: grid; gap: var(--sp-4); max-width: 420px; margin: var(--sp-6) auto 0; }
+.login { display: grid; gap: var(--sp-4); }
 /* Sin sesión no se muestra nada de la app: ni menú, ni botones, ni avisos de datos de ejemplo. */
 body.sin-sesion .tabbar, body.sin-sesion #tema-rapido, body.sin-sesion .fab { display: none !important; }
 body.sin-sesion { padding-left: 0 !important; }
@@ -1031,3 +1031,50 @@ body.modo-nube .demo-note { display: none !important; }
 .check:has(input:disabled) { cursor: default; color: var(--c-text-muted); }
 .item:has(.seleccion:focus-within) { border-color: var(--c-focus); }
 .avatar--recibo { width: 48px; height: 56px; border-radius: var(--r-sm); background: var(--c-surface-2); }
+
+/* ---------- Pantalla de entrar ---------- */
+/* Teléfono: logo, una línea que dice qué es y el formulario. Escritorio: panel de marca a la izquierda y formulario a la derecha. */
+.acceso { display: grid; gap: var(--sp-5); max-width: 460px; margin: var(--sp-5) auto 0; }
+.acceso__marca { display: grid; justify-items: center; gap: var(--sp-3); text-align: center; }
+.acceso__marca .logo-tile--grande { width: min(64%, 210px); margin: 0; }
+.acceso__lema { margin: 0; font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; color: var(--c-text); }
+.acceso__lista { display: none; }
+.campo-clave { position: relative; display: grid; }
+.campo-clave .input { padding-right: 5.5rem; }
+.ver-clave {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--c-primary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease-out);
+}
+.ver-clave:hover { background: var(--c-primary-soft); }
+@media (hover: hover) { .login .btn--primary:hover:not(:disabled) { transform: translateY(-1px); } }
+.login .btn--primary:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
+
+@media (min-width: 900px) {
+  .acceso {
+    max-width: 960px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+    gap: 0;
+    margin-top: var(--sp-6);
+    overflow: hidden;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-2);
+  }
+  .acceso__marca { align-content: center; justify-items: start; gap: var(--sp-5); padding: var(--sp-7) var(--sp-6); background: var(--brand); text-align: left; }
+  .acceso__marca .logo-tile--grande { width: 230px; }
+  .acceso__lema { color: #fff; font-size: var(--fs-2xl); line-height: 1.15; }
+  .acceso__lista { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; color: rgb(255 255 255 / 0.88); }
+  .acceso__lista li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.65em; border-radius: 50%; background: var(--c-accent); vertical-align: 0.15em; }
+  .login { align-content: center; padding: var(--sp-6); border: 0; border-radius: 0; box-shadow: none; }
+}

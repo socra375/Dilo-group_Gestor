@@ -10,25 +10,46 @@ export function pedirInicioSesion() {
     document.getElementById('header-title').textContent = 'Entrar';
     document.getElementById('header-company').textContent = CONFIG.empresa.nombre;
     document.getElementById('view').innerHTML = `
-      <form class="login card" novalidate aria-labelledby="t-login">
-        <div class="logo-tile logo-tile--grande"><img src="icons/logo.png" alt="Dilo group" width="613" height="376"></div>
-        <h2 id="t-login">Entrar a ${esc(CONFIG.empresa.nombre)}</h2>
-        <p class="muted">Usa el correo y la contraseña que te dio el administrador.</p>
-        <div class="field" data-campo="email"><label class="field__label" for="f-email">Correo</label>
-          <input class="input" id="f-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="f-email-err">
-          <p class="field__error" id="f-email-err" aria-live="polite"></p></div>
-        <div class="field" data-campo="password"><label class="field__label" for="f-password">Contraseña</label>
-          <input class="input" id="f-password" name="password" type="password" autocomplete="current-password" aria-describedby="f-password-err">
-          <p class="field__error" id="f-password-err" aria-live="polite"></p></div>
-        <p class="field__error" id="login-err" role="alert"></p>
-        <button type="submit" class="btn btn--primary btn--block">${icon('login')}Entrar</button>
-      </form>`;
+      <div class="acceso">
+        <aside class="acceso__marca">
+          <div class="logo-tile logo-tile--grande"><img src="icons/logo.png" alt="${esc(CONFIG.empresa.nombre)}" width="613" height="376"></div>
+          <p class="acceso__lema">Control de transporte de personal</p>
+          <ul class="acceso__lista">
+            <li>Viajes y retrasos del día</li>
+            <li>Choferes y su asistencia</li>
+            <li>Combustible y reportes para WhatsApp</li>
+          </ul>
+        </aside>
+        <form class="login card" novalidate aria-labelledby="t-login">
+          <h2 id="t-login">Entrar a ${esc(CONFIG.empresa.nombre)}</h2>
+          <p class="muted">Usa el correo y la contraseña que te dio el administrador.</p>
+          <div class="field" data-campo="email"><label class="field__label" for="f-email">Correo</label>
+            <input class="input" id="f-email" name="email" type="email" inputmode="email" enterkeyhint="next" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="f-email-err">
+            <p class="field__error" id="f-email-err" aria-live="polite"></p></div>
+          <div class="field" data-campo="password"><label class="field__label" for="f-password">Contraseña</label>
+            <div class="campo-clave">
+              <input class="input" id="f-password" name="password" type="password" enterkeyhint="go" autocomplete="current-password" aria-describedby="f-password-err">
+              <button type="button" class="ver-clave" data-ver-clave aria-controls="f-password" aria-label="Mostrar la contraseña">Mostrar</button>
+            </div>
+            <p class="field__error" id="f-password-err" aria-live="polite"></p></div>
+          <p class="field__error" id="login-err" role="alert"></p>
+          <button type="submit" class="btn btn--primary btn--block">${icon('login')}<span data-texto>Entrar</span></button>
+        </form>
+      </div>`;
     const form = document.querySelector('.login');
     const poner = (id, msg) => {
       document.getElementById(id).textContent = msg;
       const campo = document.getElementById(id.replace('-err', ''));
       if (campo?.tagName === 'INPUT') msg ? campo.setAttribute('aria-invalid', 'true') : campo.removeAttribute('aria-invalid');
     };
+    form.querySelector('[data-ver-clave]').addEventListener('click', (e) => {
+      const campo = form.elements.password;
+      const visible = campo.type === 'password';
+      campo.type = visible ? 'text' : 'password';
+      e.currentTarget.textContent = visible ? 'Ocultar' : 'Mostrar';
+      e.currentTarget.setAttribute('aria-label', visible ? 'Ocultar la contraseña' : 'Mostrar la contraseña');
+      campo.focus();
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = form.elements.email.value.trim();
@@ -39,6 +60,8 @@ export function pedirInicioSesion() {
       if (!/^\S+@\S+\.\S+$/.test(email) || !password) return form.querySelector('[aria-invalid="true"]')?.focus();
       const boton = form.querySelector('button[type="submit"]');
       boton.disabled = true;
+      boton.setAttribute('aria-busy', 'true');
+      boton.querySelector('[data-texto]').textContent = 'Entrando…';
       try {
         await store.entrar(email, password);
         document.body.classList.remove('sin-sesion');
@@ -49,6 +72,8 @@ export function pedirInicioSesion() {
         form.elements.password.focus();
       } finally {
         boton.disabled = false;
+        boton.removeAttribute('aria-busy');
+        boton.querySelector('[data-texto]').textContent = 'Entrar';
       }
     });
     form.elements.email.focus();

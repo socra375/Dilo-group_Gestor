@@ -399,7 +399,7 @@ let fallos = 0;
   {
     const falso = await require('./supabase-falso.cjs').crear({ usuarios: { 'ana@dilo.test': 'clave-ana' } });
     const configLocal = `export const SUPABASE = { url: ${JSON.stringify(falso.url)}, anonKey: 'anon-publica-de-prueba', bucketFotos: 'fotos' };`;
-    for (const [tema, ancho, letra] of [['light', 390, null], ['dark', 390, null], ['light', 360, 'extra'], ['dark', 360, 'extra']]) {
+    for (const [tema, ancho, letra] of [['light', 390, null], ['dark', 390, null], ['light', 360, 'extra'], ['dark', 360, 'extra'], ['light', 1280, null], ['dark', 1280, null]]) {
       const ctx = await navegador.newContext({ viewport: { width: ancho, height: 800 }, deviceScaleFactor: 2, colorScheme: tema, reducedMotion: 'reduce', locale: 'es-DO', serviceWorkers: 'block' });
       await fijarTema(ctx, tema);
       if (letra) await ctx.addInitScript((l) => { const p = JSON.parse(localStorage.getItem('ct:prefs') || '{}'); localStorage.setItem('ct:prefs', JSON.stringify({ ...p, letra: l })); }, letra);
@@ -420,7 +420,7 @@ let fallos = 0;
         const a11y = await accesibilidad(page);
         const problemas = [...fuera.map((x) => `desborde: ${x}`), ...bajos.map((x) => `contraste: ${x}`), ...a11y.map((v) => `${v.id} (${v.impacto}): ${v.ayuda} → ${v.ej}`)];
         if (problemas.length) { fallos++; console.log(`✗ ${etiqueta} (${vista})\n   ${problemas.join('\n   ')}`); } else console.log(`✓ ${etiqueta} (${vista})`);
-        if (ancho === 390) await page.screenshot({ path: path.join(SALIDA, `${tema === 'light' ? 'claro' : 'oscuro'}-entrar-${vista}.png`) });
+        if (ancho === 390 || ancho === 1280) await page.screenshot({ path: path.join(SALIDA, `${tema === 'light' ? 'claro' : 'oscuro'}-entrar${ancho === 1280 ? '-escritorio' : ''}-${vista}.png`) });
       }
       if (errores.length) { fallos++; console.log(`✗ ${etiqueta}: errores de consola\n   ${[...new Set(errores)].join('\n   ')}`); }
       await ctx.close();
