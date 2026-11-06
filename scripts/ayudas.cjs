@@ -32,7 +32,7 @@ function servidorConVersion() {
   const fs = require('fs');
   const path = require('path');
   const raiz = path.resolve(__dirname, '..');
-  const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
+  const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
   let sufijo = '';
   const srv = http.createServer((q, r) => {
     const u = decodeURIComponent(new URL(q.url, 'http://x').pathname);
@@ -41,7 +41,7 @@ function servidorConVersion() {
       if (e || !archivo.startsWith(raiz)) { r.writeHead(404); return r.end(); }
       let cuerpo = d;
       if (u === '/sw.js' && sufijo) cuerpo = Buffer.from(d.toString().replace(/const VERSION = '([^']+)'/, `const VERSION = '$1${sufijo}'`));
-      r.writeHead(200, { 'Content-Type': tipos[path.extname(archivo)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      r.writeHead(200, { 'Content-Type': tipos[path.extname(archivo)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Content-Security-Policy': require('./csp.cjs').cspPruebas() });
       r.end(cuerpo);
     });
   }).listen(0);

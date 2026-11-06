@@ -73,3 +73,24 @@ test('Vercel: vercel.json construye con armar-sitio, publica public/ y tiene las
   assert.equal(cab('/index.html'), 'no-cache');
   assert.ok(v.headers.some((h) => h.headers.some((x) => x.key === 'X-Content-Type-Options' && x.value === 'nosniff')));
 });
+
+test('CSP: vercel.json y _headers publican la misma política, sin scripts en línea ni de terceros', () => {
+  const v = JSON.parse(leer('vercel.json'));
+  const csp = v.headers.flatMap((h) => h.headers).find((x) => x.key === 'Content-Security-Policy')?.value;
+  assert.ok(csp, 'vercel.json debe tener Content-Security-Policy');
+  assert.equal(leer('_headers').match(/Content-Security-Policy: (.+)/)?.[1], csp, '_headers y vercel.json deben coincidir');
+  const dir = (n) => csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${n} `));
+  assert.equal(dir('script-src'), "script-src 'self'", 'sin unsafe-inline ni dominios externos en scripts');
+  assert.match(dir('object-src'), /'none'/);
+  assert.match(dir('frame-ancestors'), /'none'/);
+  assert.doesNotMatch(csp, /\*(?!\.supabase\.co)/, 'ningún comodín salvo *.supabase.co');
+});
+
+test('index.html: sin scripts en línea, sin Google Fonts, y todo archivo de fuentes está en el service worker', () => {
+  const html = leer('index.html');
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i, 'un <script> sin src sería bloqueado por la CSP');
+  assert.doesNotMatch(html, /fonts\.g(oogleapis|static)\.com/);
+  const sw = leer('sw.js');
+  for (const f of fs.readdirSync(path.join(raiz, 'src/fonts'))) assert.ok(sw.includes(`./src/fonts/${f}`), `${f} falta en ARCHIVOS de sw.js`);
+  assert.ok(sw.includes('./src/tema-inicial.js'));
+});

@@ -357,8 +357,10 @@ let fallos = 0;
     await page.waitForSelector('.graf svg');
     await page.evaluate(() => { location.hash = '#/viajes'; });
     await page.waitForFunction(() => document.getElementById('header-title')?.textContent === 'Viajes');
+    // El router pone el título antes de terminar de pintar la pantalla; la clase de entrada se añade al final.
+    if (!reducir) await page.waitForSelector('.view--enter');
     const m = await page.evaluate(() => {
-      const seg = (el) => parseFloat(getComputedStyle(el).animationDuration) * (getComputedStyle(el).animationDuration.endsWith('ms') ? 0.001 : 1);
+      const seg =(el) => parseFloat(getComputedStyle(el).animationDuration) * (getComputedStyle(el).animationDuration.endsWith('ms') ? 0.001 : 1);
       const vista = document.querySelector('.view');
       const hijo = vista.children[2]; // las tarjetas entran escalonadas (movimiento.js), salvo con reducir movimiento
       return { vista: seg(vista), nombre: getComputedStyle(vista).animationName, hijo: getComputedStyle(hijo).animationName };

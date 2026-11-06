@@ -130,7 +130,8 @@ src/core/agregados.js     cálculos de reportes y CSV    src/core/share.js   Wha
 src/core/pdf.js           generador de PDF mínimo       src/core/reporteCombustible.js  reporte para el jefe
 src/core/grafica.js       gráfica de barras en SVG      src/core/fotos.js   reducir y mostrar fotos
 src/modules/              una pantalla por archivo (+ extensiones/ reservadas)
-src/styles/               tokens, base, componentes, animaciones
+src/styles/               tokens, base (con las fuentes), componentes, animaciones
+src/fonts/                fuentes alojadas (Barlow Semi Condensed, Atkinson Hyperlegible)
 tests/                    pruebas unitarias (node --test) y tests/fixtures/ (datos de prueba para e2e y QA, no se publican)
 scripts/                  armar-sitio.sh (lo que se publica), servidor local, QA, e2e (+ modo nube), Supabase falso, generador de íconos, generador de config.local.js para publicar
 .github/workflows/        ci.yml (pruebas en cada push) y pages.yml (GitHub Pages, manual)

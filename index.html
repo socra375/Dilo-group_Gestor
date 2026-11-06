@@ -15,24 +15,12 @@
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
 
   <link rel="stylesheet" href="src/styles/tokens.css">
   <link rel="stylesheet" href="src/styles/base.css">
   <link rel="stylesheet" href="src/styles/components.css">
   <link rel="stylesheet" href="src/styles/animations.css">
-  <script>
-    // Aplica tema y tamaño de letra antes de pintar para evitar parpadeo.
-    try {
-      var p = JSON.parse(localStorage.getItem('ct:prefs') || '{}');
-      // Mismas reglas que src/core/prefs.js: por defecto claro y letra normal (17 px).
-      document.documentElement.dataset.theme = p.tema === 'oscuro' ? 'oscuro' : 'claro';
-      var px = { normal: 17, grande: 19, extra: 21 }[p.letra];
-      if (px) document.documentElement.style.fontSize = px + 'px';
-    } catch (e) {}
-  </script>
+  <script src="src/tema-inicial.js"></script>
   <script type="module" src="src/app.js"></script>
 </head>
 <body>

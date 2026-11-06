@@ -732,6 +732,27 @@ async function espera(cond, ms = 4000) {
     ok((await page.textContent('#toasts')).includes('no permite adjuntar el PDF'), 'y avisa que el PDF hay que adjuntarlo a mano');
   }
 
+  // Política de seguridad (CSP): se envía y bloquea scripts en línea; no se pide nada a terceros; las fuentes salen del propio sitio.
+  {
+    const ctxC = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    const pC = await ctxC.newPage();
+    const externas = [];
+    const violaciones = [];
+    pC.on('request', (r) => { if (!/^(http:\/\/localhost|data:|blob:)/.test(r.url())) externas.push(r.url()); });
+    pC.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violaciones.push(m.text()); });
+    const resp = await pC.goto(base);
+    const csp = resp.headers()['content-security-policy'] || '';
+    ok(/script-src 'self'(;|$)/.test(csp), 'el servidor envía una CSP con script-src \'self\'');
+    await pC.waitForSelector('.view');
+    ok(!violaciones.length, `la app arranca sin violaciones de la CSP${violaciones.length ? `: ${violaciones[0]}` : ''}`);
+    ok(!externas.length, `no se pide nada a servidores de terceros${externas.length ? `: ${externas.join(', ')}` : ''}`);
+    await pC.evaluate(() => { const s = document.createElement('script'); s.textContent = 'window.__inyectado = true'; document.head.appendChild(s); });
+    ok(!(await pC.evaluate(() => window.__inyectado)), 'un script en línea inyectado (como en un XSS) no se ejecuta');
+    const fuentes = await pC.evaluate(async () => { await document.fonts.ready; return [...document.fonts].filter((f) => f.status === 'loaded').map((f) => `${f.family} ${f.weight}`); });
+    ok(fuentes.length >= 2, `las fuentes propias cargan (${fuentes.join(', ')})`);
+    await ctxC.close();
+  }
+
   // Movimiento (sin "reducir movimiento"): tarjetas que entran escalonadas, indicador que se desliza y onda al cambiar de tema.
   {
     const ctxM = await navegador.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'America/Santo_Domingo' });
