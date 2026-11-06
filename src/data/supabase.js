@@ -184,11 +184,13 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
       return aRegistro(col, filas[0]);
     },
     async update(col, id, cambios) {
+      if (!esUuid(id)) throw new Error('El registro ya no existe.');
       const filas = await json(await pedir(`${tabla(col)}?id=eq.${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(aFila(col, { ...cambios, actualizado: new Date().toISOString() })) }));
       if (!filas.length) throw new Error('El registro ya no existe.');
       return aRegistro(col, filas[0]);
     },
     async remove(col, id) {
+      if (!esUuid(id)) return false;
       const filas = await json(await pedir(`${tabla(col)}?id=eq.${id}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } }));
       return filas.length > 0;
     },
@@ -199,6 +201,7 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
       return lista.length;
     },
     async removeMany(col, ids) {
+      ids = ids.filter(esUuid); // un id con símbolos podría colar otro filtro en la URL de PostgREST
       let n = 0;
       for (let i = 0; i < ids.length; i += 100) {
         const filas = await json(await pedir(`${tabla(col)}?${filtroIds(ids.slice(i, i + 100))}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } }));
@@ -210,7 +213,10 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
 
   // ---------- Fotos (Storage privado, URLs firmadas) ----------
   const carpeta = () => sesion?.usuario?.id;
-  const rutaFoto = (id) => `${carpeta()}/${id}`;
+  const rutaFoto = (id) => {
+    if (!esUuid(id)) throw new Error('Foto no válida.'); // evita rutas tipo ../ hacia otra carpeta de Storage
+    return `${carpeta()}/${id}`;
+  };
 
   const fotos = {
     async guardar(blob, id) {
@@ -220,7 +226,7 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
     },
     /** Crea una URL firmada de corta vida y descarga la imagen. null si no existe. */
     async leer(id) {
-      if (!id) return null;
+      if (!esUuid(id)) return null;
       const f = await pedir(`/storage/v1/object/sign/${bucketFotos}/${rutaFoto(id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 300 }) });
       if (f.status === 400 || f.status === 404) return null;
       const { signedURL } = await json(f);
@@ -228,7 +234,7 @@ export function crearCliente({ url, anonKey, bucketFotos = 'fotos' }, { fetchFn 
       return r.ok ? r.blob() : null;
     },
     async borrar(id) {
-      if (!id) return;
+      if (!esUuid(id)) return;
       const r = await pedir(`/storage/v1/object/${bucketFotos}/${rutaFoto(id)}`, { method: 'DELETE' });
       if (!r.ok && r.status !== 404) throw new Error(await mensajeDe(r));
     },

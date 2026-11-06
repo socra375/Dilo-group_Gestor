@@ -114,6 +114,7 @@ Los módulos futuros (sueldos, mantenimiento completo, servicios del vehículo, 
 index.html, manifest.webmanifest, sw.js, vercel.json, _headers, LICENSE.md, README.md, DECISIONES.md
 config.example.js         plantilla de src/config.local.js (activa el modo nube; ese archivo no se sube)
 supabase/001_tablas_y_seguridad.sql   tablas, RLS y bucket privado (se ejecuta una vez en Supabase)
+supabase/002_endurecimiento.sql       referencias del mismo dueño, topes de longitud, función de plataforma no expuesta (después de la 001)
 icons/                    logo del cliente (`logo.png`, `logo-marca.png`) e íconos de la PWA (`python3 scripts/logo.py <imagen>` y luego `node scripts/iconos.cjs`)
 src/app.js                arranque: apariencia, migración de datos, router, service worker
 src/config.js             CONFIG del cliente: qué está activo
@@ -149,7 +150,7 @@ scripts/                  armar-sitio.sh (lo que se publica), servidor local, QA
 
 ### Pasos
 1. **Proyecto**: crea uno en [supabase.com](https://supabase.com) (o usa uno propio). Región cercana (p. ej. Norteamérica Este).
-2. **SQL**: *SQL Editor → New query*, pega el bloque de abajo y ejecútalo **una vez**. Está en `supabase/001_tablas_y_seguridad.sql`.
+2. **SQL**: *SQL Editor → New query*, pega el bloque de abajo y ejecútalo **una vez**. Está en `supabase/001_tablas_y_seguridad.sql`. Después ejecuta también `supabase/002_endurecimiento.sql` (capas extra; idempotente) y, para comprobarlo todo contra tu Postgres real, `supabase/pruebas/aislamiento.sql` (no deja nada).
 3. **Cerrar el registro**: *Authentication → Sign In / Providers → Email*: desactiva **"Allow new users to sign up"** (si no, cualquiera con la clave pública se puede crear una cuenta). Considera también exigir contraseña larga.
 4. **Crear el usuario**: *Authentication → Users → Add user* con el correo y la contraseña del supervisor.
 5. **Conectar la página**: copia `config.example.js` como `src/config.local.js` y pon la **URL del proyecto** y la **clave anon/publishable** (*Project Settings → API*). La clave `anon` clásica y la nueva `sb_publishable_…` funcionan; la nueva no es un JWT y el cliente la manda solo en `apikey`. Para probar en tu computadora: `npm run serve`.

@@ -101,3 +101,17 @@ test('combustiblePorVehiculo: totales, precio por galón y rendimiento promedio;
   assert.deepEqual([r[1].cargas, r[1].kmGal], [1, null]); // una sola carga: aún sin rendimiento
   assert.deepEqual(combustiblePorVehiculo([], { desde: '2026-10-01', hasta: '2026-10-31' }), []);
 });
+
+test('aCSV neutraliza fórmulas (inyección de CSV) sin tocar números ni textos normales', () => {
+  const csv = aCSV(['Texto'], [['=HYPERLINK("http://x","clic")'], ['+cmd|calc'], ['-2+3'], ['@SUM(A1)'], ['\t=1'], ['+18095551234'], [-5], ['Estación Shell'], ['08:30']]);
+  const filas = csv.split('\r\n');
+  assert.ok(filas[1].startsWith('"\'=HYPERLINK(""http://x"",""clic"")"'), filas[1]);
+  assert.equal(filas[2], "'+cmd|calc");
+  assert.equal(filas[3], "'-2+3");
+  assert.equal(filas[4], "'@SUM(A1)");
+  assert.ok(filas[5].startsWith("'\t=1") || filas[5].startsWith('"\'\t=1'));
+  assert.equal(filas[6], '+18095551234', 'un teléfono con + es un número, no una fórmula');
+  assert.equal(filas[7], '-5', 'un número real no se toca');
+  assert.equal(filas[8], 'Estación Shell');
+  assert.equal(filas[9], '08:30');
+});

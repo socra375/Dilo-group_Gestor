@@ -68,8 +68,11 @@ export function combustiblePor(cargas, periodo, { hoy, n }) {
 
 /** CSV compatible con Excel (BOM UTF-8, coma, CRLF). */
 export function aCSV(encabezados, filas) {
+  // Inyección de fórmulas: Excel/Sheets ejecutan como fórmula un texto que empieza por = + - @ (o tabulador / retorno).
+  // Se les antepone ' para que se lean como texto. Los números reales (incluido +1809…) no se tocan.
   const celda = (v) => {
-    const t = v == null ? '' : String(v);
+    let t = v == null ? '' : String(v);
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(t) && !/^[+-]?\d[\d.,]*$/.test(t)) t = `'${t}`;
     return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
   return `﻿${[encabezados, ...filas].map((f) => f.map(celda).join(',')).join('\r\n')}\r\n`;

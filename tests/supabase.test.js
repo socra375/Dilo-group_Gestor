@@ -368,3 +368,33 @@ test('Fotos: listar devuelve todas, borrar quita la foto, tipos no permitidos y 
     assert.equal((await c.fotos.leer(b)).size, 9);
   } finally { await e.servidor.cerrar(); }
 });
+
+test('inyección: un id con símbolos nunca llega a la URL (filtros de PostgREST ni rutas de Storage)', async () => {
+  const e = await entorno();
+  try {
+    const ana = await conSesion(e);
+    const mio = await ana.datos.create('choferes', { nombre: 'Mío' });
+    const malos = ['x&owner=neq.0', `${mio.id}&id=neq.0`, 'a,b)&id=not.is.null', '../otro-usuario/foto'];
+    for (const m of malos) {
+      await assert.rejects(() => ana.datos.update('choferes', m, { nombre: 'X' }), /ya no existe/);
+      assert.equal(await ana.datos.remove('choferes', m), false);
+      assert.equal(await ana.datos.get('choferes', m), null);
+      assert.equal(await ana.fotos.leer(m), null);
+      await ana.fotos.borrar(m); // no hace nada ni lanza
+      await assert.rejects(() => ana.fotos.guardar(new Blob(['x'], { type: 'image/jpeg' }), m), /Foto no válida/);
+    }
+    // Un id malo mezclado con uno bueno: solo se borra el bueno, y el resto de la tabla queda intacto.
+    const otro = await ana.datos.create('choferes', { nombre: 'Otro' });
+    assert.equal(await ana.datos.removeMany('choferes', [otro.id, 'x&id=neq.0']), 1);
+    assert.equal((await ana.datos.list('choferes')).length, 1);
+    assert.equal((await ana.datos.get('choferes', mio.id)).nombre, 'Mío');
+  } finally { await e.servidor.cerrar(); }
+});
+
+test('SQL 002: referencias del mismo dueño en las 4 tablas con referencias, topes de longitud y función de plataforma no expuesta', () => {
+  const sql = fs.readFileSync(new URL('../supabase/002_endurecimiento.sql', import.meta.url), 'utf8');
+  for (const t of ['choferes', 'viajes', 'combustible', 'asistencia']) assert.match(sql, new RegExp(`create trigger verificar_referencias before insert or update on public\\.${t}`));
+  assert.doesNotMatch(sql, /security definer/i, 'la verificación debe correr con los permisos de quien escribe, para que RLS la acote a lo suyo');
+  assert.match(sql, /revoke execute on function public\.rls_auto_enable\(\) from public, anon, authenticated/);
+  assert.match(sql, /char_length\(%I\) <= %s/);
+});

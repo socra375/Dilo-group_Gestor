@@ -67,5 +67,24 @@ begin
   select count(*) into n from storage.objects where bucket_id = 'fotos'; r := r || format('U2 ve fotos de U1: %s (esperado 0); ', n);
   reset role;
 
+  -- Endurecimiento (requiere haber ejecutado 002_endurecimiento.sql)
+  perform set_config('request.jwt.claims', json_build_object('sub', u2, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', u2::text, true);
+  set local role authenticated;
+  begin
+    insert into public.viajes (chofer_id, salida_prog, llegada_prog) values (ch1, now(), now());
+    r := r || 'U2 apunta su viaje al chofer de U1: PERMITIDO (MAL); ';
+  exception when others then r := r || 'U2 apunta su viaje al chofer de U1: rechazado (bien); ';
+  end;
+  begin
+    insert into public.choferes (nombre, notas) values ('Largo', repeat('x', 1001));
+    r := r || 'notas de 1001 caracteres: PERMITIDO (MAL); ';
+  exception when others then r := r || 'notas de 1001 caracteres: rechazado (bien); ';
+  end;
+  reset role;
+  set local role anon;
+  r := r || format('anon ejecuta rls_auto_enable: %s (esperado false); ', has_function_privilege('anon', 'public.rls_auto_enable()', 'execute'));
+  reset role;
+
   raise exception 'RESULTADOS: %', r; -- deshace todo lo anterior
 end $$;
